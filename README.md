@@ -2,148 +2,85 @@
 
 ## Project overview
 
-**Papersec:** share an unpublished paper with exactly one reviewer, for a fixed window. No single author, admin or platform operator can open, extend or leak it alone.
+**Papersec** delivers an unpublished manuscript to exactly one reviewer, for a fixed window — where no single author, administrator or platform operator can open, extend or leak it alone.
 
 Built with [TideCloak](https://tide.org/tidecloak?utm_source=github&utm_medium=readme&utm_campaign=unlocked).
 
 ### 1. Vision & originality
 
-Papersec là kênh gửi **bản thảo nghiên cứu chưa công bố** cho học viên và nhóm nghiên cứu. Một bản thảo chỉ mở được khi đủ bốn điều kiện: **đúng người nhận**, **đúng paper**, **trong đúng thời hạn**, và **nhóm tác giả cùng đồng ý (2/3)**.
-
-Điểm khác biệt: các luật này không nằm trong code của server mà do **mạng mật mã phân tán của Tide** thực thi. Vì vậy chính người vận hành nền tảng cũng không vượt rào được.
+A manuscript opens only when four conditions hold at once: the right reader, the right paper, inside the review window, and with **2 of 3 authors agreeing**. What separates this from any sharing platform is where those rules live. They are not enforced by our server code, which we could change — they are enforced by Tide's threshold cryptography, so the people who run Papersec cannot override them either.
 
 ### 2. Trust constraint insight
 
-Hôm nay, gửi bản thảo qua email, Google Drive hay hệ thống nộp bài nghĩa là **nhà cung cấp và admin của họ đọc được toàn bộ**. Hơn nữa, chỉ cần **một người** là đủ làm lộ: một đồng tác giả bất cẩn bấm "chia sẻ", hoặc một admin tò mò. Hậu quả là mất **quyền ưu tiên khoa học**, bị lấy ý tưởng trước khi công bố.
-
-Khi gỡ được ràng buộc "phải tin một người giữ chìa khóa", nhóm nghiên cứu có thể đưa bản thảo cho phản biện bên ngoài, hội đồng hay đối tác mà không phải đặt cược vào thiện chí của bất kỳ ai, kể cả nền tảng trung gian.
+Email, Drive and submission portals all require handing the full text to a provider and its administrators. Worse, **one** careless co-author or one curious admin is enough to leak a draft before publication, costing a research team its scientific priority. Remove the need to trust any single party, and a team can send a draft to an external reviewer without betting on anyone's good behaviour.
 
 ### 3. Value & impact
 
-**Ví dụ:** một học viên cao học cần gửi luận văn chưa công bố cho một giáo sư phản biện ở trường khác, hạn đọc 7 ngày.
+A graduate student sends an unpublished thesis to an examiner at another university for seven days:
 
-- Tác giả chính bấm "Mời phản biện". Lời mời chỉ có hiệu lực khi **GV hướng dẫn hoặc đồng tác giả** cùng duyệt (2/3).
-- Người phản biện đọc được **đúng paper đó**, không thấy paper khác của nhóm, và gửi lại **nhận xét đã mã hóa** mà chỉ nhóm tác giả đọc được.
-- Hết 7 ngày, quyền đọc **tự hết hạn**. Không ai gia hạn lén được, kể cả người vận hành server.
-
-Người hưởng lợi: học viên, nhóm nghiên cứu, hội đồng khoa học, và bất kỳ ai cần chia sẻ tài liệu nhạy cảm có thời hạn với người bên ngoài.
+- The invitation only takes effect once a supervisor or co-author also approves it (2 of 3).
+- The examiner opens **that one manuscript** — not the team's other work — and replies with encrypted feedback only the authors can read.
+- After seven days access lapses. Nobody can quietly extend it, including whoever runs the server.
 
 ### 4. Why TideCloak matters
 
-| Đề bài | Papersec dùng TideCloak thế nào |
+| Challenge requirement | How Papersec uses TideCloak |
 |---|---|
-| **Identity** | Người nhận đăng nhập bằng tài khoản Tide (DPoP, backend xác minh token) |
-| **Policy** | Mỗi paper có policy `RelationshipAttestation:1` riêng, **hạn chót được ký bằng mật mã ngưỡng** |
-| **Approvals** | Cấp quyền đọc là một change request, cần **2/3 tác giả** duyệt qua Quorum-Enforced Authorization |
+| **Identity** | Reviewers sign in with Tide; the backend verifies the DPoP-bound token and trusts only the roles inside it |
+| **Policy** | Each manuscript has a `RelationshipAttestation:1` policy whose **expiry is sealed by threshold signature** |
+| **Approvals** | Granting read access is a change request needing **2 of 3 authors** via Quorum-Enforced Authorization |
 
-**Người vận hành nền tảng (Operator) không mở được paper chưa được chia sẻ:**
+The point of the system is what the platform operator *cannot* do:
 
-| Operator thử | Bị chặn bởi |
+| Operator attempt | Blocked by |
 |---|---|
-| Đọc file trên đĩa, dump database | Chỉ có ciphertext; PDF được mã hóa ngay trong trình duyệt tác giả |
-| Sửa database để tự cấp quyền | Backend chỉ tin role trong token do Tide ký |
-| Lấy ciphertext rồi tự giải mã | Mạng ORK từ chối: Operator không có role đọc paper |
-| Dùng tài khoản master admin để tự gán role | Thành change request chờ duyệt; Operator không thuộc nhóm duyệt |
-| "Gia hạn" paper đã hết hạn bằng cách sửa database | Backend mở lại, nhưng **mạng ORK vẫn từ chối** vì hạn nằm trong policy đã ký |
-
-> **Trạng thái kiểm chứng:** hai dòng đầu đã có test backend. Các dòng về mạng ORK và change request là thiết kế, sẽ được cập nhật theo kết quả thật (T9, T12, T16) trong [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md).
-
-Không có Tide, khóa giải mã sẽ nằm trên server, và người giữ server đọc được mọi thứ. Tide chia khóa ra trên mạng ORK để không ai giữ trọn, đó là điều làm lời hứa của Papersec thành sự thật.
+| Read the disk, dump the database | Ciphertext only — PDFs are encrypted in the author's browser |
+| Edit the database to self-grant access | The backend trusts roles in the Tide-signed token, never the database |
+| Decrypt while holding both ciphertext and policy | The ORK network refuses: no reader role, no `_tide_decryptor` |
+| Extend an expired manuscript via `review_until` | The expiry lives in the signed policy, not in the database |
 
 ### 5. Prototype & storytelling
 
-<!-- What does your prototype demonstrate today? Describe the key interaction judges should look for. -->
+Four role-based views — Author Workspace, Reviewer Inbox, Operator Console, Policy Signing — over three synthetic manuscripts: `p1` shared live, `p2` never shared, `p3` already expired.
 
----
+**What to look for:** an author invites a reviewer to `p1` and nothing happens until a second author approves. The reviewer then opens `p1`, but gets `403` on `p2` and `p3`. Finally the operator — holding full disk, database and admin access — edits `review_until` to "extend" `p3`: the backend stops blocking, and decryption **still fails**, because the deadline is inside the signed policy. Revocation likewise needs 2 of 3.
 
-## Chạy bản mô phỏng (Plan C) — không cần mạng Tide
+**Honest limits.** Tide's ORK network was overloaded during the hackathon, so per the organisers' [Plan C](https://tide.org/unlocked/#plan-c) these protections are **simulated**: `src/lib/mock/` enforces the real rules (quorum, roles, record tags, expiry, token lifetime), but the threshold signatures and the encryption itself are stand-ins, not cryptographic proof. Application code (`src/App.jsx`, `src/lib/api.js`, `src/lib/relationship.js`, `server/**`) is unmodified — `vite.config.js` only redirects four imports in simulation mode. Beyond that: a reader can save or screenshot a PDF once opened, revocation stops *future* access but cannot recall what was already read, and manuscript titles remain server-visible metadata. Measurements and failures are logged in [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md).
 
-Mạng ORK của Tide đang quá tải nên bước liên kết tài khoản chưa hoàn tất được (chi tiết và số đo
-trong [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md)). Theo thông báo chính thức của ban tổ
-chức — [tide.org/unlocked/#plan-c](https://tide.org/unlocked/#plan-c), *"build your prototype as
-though TideCloak protects it and simulate those protections for now… judged exactly the same as a
-live integration"* — repo này có sẵn một bản mô phỏng chạy được ngay:
+## Setup
+
+Requires Node.js ≥ 22.5. **Simulated mode needs nothing else** — no Docker, no Tide network:
 
 ```bash
 npm install
 npm run preview:ui     # http://localhost:5138
 ```
 
-Mỗi **tab** là một người (thay cho 5 Chrome profile ở bản thật). Mở 3 tab, chọn `owner`,
-`approver2`, `reviewer` để chạy trọn luồng 2/3 duyệt trong [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
-
-### Cái gì được mô phỏng, cái gì là thật
-
-| Lớp | File | Trong bản mô phỏng | Ở bản thật |
-|---|---|---|---|
-| Governance | `src/lib/mock/realm.js` | Change request cần **2/3** tác giả duyệt; Operator duyệt bị `403` | TideCloak + QEA Approvals |
-| Mật mã | `src/lib/mock/ork.js` | Policy đã "ký" mang `subject` + `recordId` + `expiry`; mọi lần giải mã đều kiểm lại | Mạng ORK, chữ ký ngưỡng |
-| Dữ liệu server | `src/lib/mock/db.js` | Operator sửa được thoải mái — và vẫn không mở được paper | SQLite + ổ đĩa |
-| Đăng nhập | `src/lib/mock/tidecloak-react.jsx` | Token **chụp role lúc cấp**, hạn 10 phút: role mới phải bấm Refresh token | JWT do Tide ký, DPoP, `accessTokenLifespan` 600s |
-| Thu hồi | `src/lib/mock/realm.js` | Gỡ role cũng cần **2/3**; chặn từ token kế tiếp (T10) | Change request trong tide-console |
-
-**Thành thật về giới hạn:** chữ ký ngưỡng và mã hóa trong `ork.js` là mô phỏng — chúng chứng minh
-*luật* (đúng paper, đúng hạn, đúng role, policy sửa là hỏng), **không** chứng minh mật mã. Toàn bộ
-mã nguồn thật (`src/App.jsx`, `src/lib/api.js`, `src/lib/relationship.js`, `server/**`) **không bị
-sửa một dòng nào** cho bản mô phỏng: `vite.config.js` chỉ đổi hướng 4 import khi chạy
-`--mode preview-ui`. Khi mạng Tide ổn định, `npm run dev` chạy tích hợp thật mà không cần đổi code.
-
-### Kiểm thử
+Each browser **tab** is a different person: open several and sign in as `owner`, `approver2`, `reviewer`, `operator`. The walkthrough is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 
 ```bash
-npm test         # 27 test backend thật (JWT/DPoP tự sinh)
-npm run test:sim # 34 test luật mô phỏng: quyền, quorum 2/3, thu hồi, hết hạn, ORK
+npm test         # 30 backend tests (self-minted JWT/DPoP)
+npm run test:sim # 35 tests of the simulated rules, incl. a full demo run-through
 ```
 
----
-
-## Setup (tích hợp Tide thật)
-
-Yêu cầu: Docker Desktop, Node.js ≥ 22.5 (dùng `node:sqlite`), `jq`, `curl`. Chạy trên macOS/Linux.
-
-### 1. Cài đặt
+<details>
+<summary><strong>Live TideCloak integration</strong> (needs Docker and a licensed realm)</summary>
 
 ```bash
-npm install
-cp .env.example .env
+cp .env.example .env            # licence email, Tide T&C consent, admin password
+bash scripts/tide/bootstrap.sh  # container, realm, client, licence, IGA
+bash scripts/tide/users.sh      # five identities
+bash scripts/tide/pivot.sh      # Papersec roles
+bash scripts/tide/invite.sh     # account-linking links — single use each
 ```
 
-Điền `.env`: `TIDE_LICENSE_EMAIL` (email **của bạn** để quản lý licence Tide), `TIDE_TERMS_ACCEPTED=yes` **chỉ khi** bạn đã đọc và đồng ý https://tide.org/legal, và `KC_BOOTSTRAP_ADMIN_PASSWORD` (mật khẩu master admin, chỉ dùng local). `.env` đã nằm trong `.gitignore`.
-
-### 2. Dựng TideCloak và realm
+Each person opens their own link in a clean window and creates a **separate** Tide account; one Tide account cannot be linked to two users. Once all five are linked:
 
 ```bash
-bash scripts/tide/bootstrap.sh   # container TideCloak (port 8080), realm, client, licence, bật IGA
-bash scripts/tide/users.sh       # tạo 5 user: owner, approver2, approver3, reviewer, operator
-bash scripts/tide/pivot.sh       # gán role Papersec (ps-author, ps-operator, ps-paper-*-reader)
-bash scripts/tide/invite.sh      # in 5 link liên kết tài khoản Tide (sống 12 giờ)
+CONFIRM_FLIP=yes bash scripts/tide/finalize.sh   # grants tide-realm-admin — irreversible
+node scripts/make-sample-papers.mjs              # three synthetic PDFs
+npm run server                                   # API on :8787
+npm run dev                                      # app on :5137
 ```
 
-Mở **từng** link trong một cửa sổ ẩn danh riêng và **tạo một tài khoản Tide mới cho mỗi user**. Một tài khoản Tide chỉ gắn được với một user, và licence phải cho phép đủ 5 tài khoản.
-
-### 3. Chuyển realm sang nhiều admin (một chiều)
-
-Chỉ chạy khi **cả 5** đã liên kết. Bước này gán `tide-realm-admin` cho 3 tác giả và **không hoàn tác được**:
-
-```bash
-CONFIRM_FLIP=yes bash scripts/tide/finalize.sh   # đồng thời xuất public/tidecloak.json
-```
-
-### 4. Chạy app
-
-```bash
-node scripts/make-sample-papers.mjs   # sinh 3 PDF tổng hợp vào samples/
-npm run server                        # backend: http://localhost:8787
-npm run dev                           # frontend: http://localhost:5137
-```
-
-Mở http://localhost:5137 và đăng nhập bằng Tide. Mỗi user dùng một Chrome profile riêng.
-
-### 5. Kiểm thử
-
-```bash
-npm test         # test backend (JWT/DPoP tự sinh — chỉ kiểm logic phân quyền, không phải tích hợp Tide)
-npm run build
-```
-
-Kết quả đo thật trên Tide được ghi trong [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md).
+</details>
