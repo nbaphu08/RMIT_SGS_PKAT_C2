@@ -1,4 +1,4 @@
-// SQLite + storage cho Unreleased Studio. DB và blob chỉ chứa ciphertext (T14).
+// SQLite + storage cho Papersec. DB và blob chỉ chứa ciphertext (T14).
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -18,22 +18,18 @@ db.exec(`
     username    text,
     first_seen  text not null
   );
-  create table if not exists projects (
-    id   text primary key,
-    name text not null
-  );
-  create table if not exists tracks (
-    id         text primary key,
-    project_id text not null,
-    title      text not null,
-    blob_size  integer,
-    updated_at text
+  create table if not exists papers (
+    id           text primary key,
+    code_title   text not null,
+    review_until text,
+    blob_size    integer,
+    updated_at   text
   );
   -- policy đã ký (bytes base64). Subject 'User' = tideuserkey, 'Role' = tên role.
   create table if not exists policies (
     id           integer primary key autoincrement,
-    track_id     text not null,
-    record       text not null,        -- 'trk' | 'fb'
+    paper_id     text not null,
+    record       text not null,        -- 'doc' | 'fb'
     subject_kind text not null,        -- 'User' | 'Role'
     subject      text not null,
     policy       text not null,
@@ -42,14 +38,14 @@ db.exec(`
   );
   create table if not exists feedback (
     id         integer primary key autoincrement,
-    track_id   text not null,
+    paper_id   text not null,
     author_sub text not null,
     ciphertext text not null,
     created_at text not null
   );
-  create table if not exists share_requests (
+  create table if not exists invites (
     id                integer primary key autoincrement,
-    track_id          text not null,
+    paper_id          text not null,
     reviewer          text not null,
     status            text not null,
     change_request_id text,
@@ -65,19 +61,20 @@ db.exec(`
   );
 `);
 
-// Seed cố định theo mục 3.1: 1 project, 3 track.
-const SEED_TRACKS = [
-  ['t1', 'Midnight Demo (v3)'],
-  ['t2', 'Untitled Hook'],
-  ['t3', 'B-side Sketch'],
-];
-db.prepare(`insert or ignore into projects (id, name) values (?, ?)`).run('p1', 'Unreleased Studio');
-const insertTrack = db.prepare(
-  `insert or ignore into tracks (id, project_id, title) values (?, 'p1', ?)`,
-);
-for (const [id, title] of SEED_TRACKS) insertTrack.run(id, title);
+const days = (n) => new Date(Date.now() + n * 86_400_000).toISOString();
 
-export const TRACK_IDS = SEED_TRACKS.map(([id]) => id);
+// Seed cố định theo mục 3.1: p1 còn hạn, p2 chưa chia sẻ, p3 đã hết hạn.
+const SEED_PAPERS = [
+  ['p1', 'Low-Resource ASR for Vietnamese Dialects', days(7)],
+  ['p2', 'Federated Learning on Hospital Imaging', null],
+  ['p3', 'Quantum-Safe Voting Protocol', days(-1)],
+];
+const insertPaper = db.prepare(
+  `insert or ignore into papers (id, code_title, review_until) values (?, ?, ?)`,
+);
+for (const [id, title, until] of SEED_PAPERS) insertPaper.run(id, title, until);
+
+export const PAPER_IDS = SEED_PAPERS.map(([id]) => id);
 
 /** Audit: chỉ ghi ai làm gì với cái gì, không ghi token/proof/policy/plaintext (mục 5.2). */
 export function audit(actor, action, target, result) {

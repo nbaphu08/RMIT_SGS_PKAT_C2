@@ -94,5 +94,5 @@ export function requireApprover(req, res, next) {
   return req.auth.isApprover ? next() : deny(req, res, 'missing tide-realm-admin');
 }
 
-export const isOwner = (req) => req.auth.roles.includes('us-owner');
-export const isReviewerOf = (req, trackId) => req.auth.roles.includes(`us-trk-${trackId}-reviewer`);
+export const isAuthor = (req) => req.auth.roles.includes('ps-author');
+export const isReaderOf = (req, paperId) => req.auth.roles.includes(`ps-paper-${paperId}-reader`);

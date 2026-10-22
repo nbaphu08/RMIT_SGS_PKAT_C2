@@ -2,9 +2,9 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import { audit, db } from './db.js';
 import { requireAuth } from './auth.js';
-import tracks from './routes/tracks.js';
+import papers from './routes/papers.js';
 import feedback from './routes/feedback.js';
-import shares from './routes/shares.js';
+import invites from './routes/invites.js';
 import operator from './routes/operator.js';
 import auditRoutes from './routes/audit.js';
 
@@ -36,7 +36,7 @@ app.get('/api/me', requireAuth, (req, res) => {
   res.json({ sub, tideuserkey, username, roles, is_approver: isApprover });
 });
 
-app.use('/api', requireAuth, tracks, feedback, shares, operator, auditRoutes);
+app.use('/api', requireAuth, papers, feedback, invites, operator, auditRoutes);
 
 for (const dir of ['public', 'dist']) {
   if (existsSync(new URL(`../${dir}`, import.meta.url))) {
@@ -51,5 +51,5 @@ app.use((err, req, res, next) => {
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const port = Number(process.env.PORT ?? 8787);
-  app.listen(port, () => console.log(`Unreleased Studio API on http://localhost:${port}`));
+  app.listen(port, () => console.log(`Papersec API on http://localhost:${port}`));
 }
