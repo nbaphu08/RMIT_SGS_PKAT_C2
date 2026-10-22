@@ -419,7 +419,9 @@ function OperatorConsole() {
     setAttempt(`tải ciphertext ${paperId} từ đĩa (Operator có toàn quyền storage) rồi thử giải mã…`);
     try {
       const ciphertext = await api.operatorBlob(paperId);
-      const policy = await policyFor(paperId, "doc");
+      const [row] = await api.operatorPolicies(paperId);
+      if (!row) throw new Error(`chưa có policy doc:${paperId} trong DB — ký ở tab Ký policy trước`);
+      const policy = row.policy;
       const pdf = await decryptBytesForRecord(ciphertext, `doc:${paperId}`, policy);
       setAttempt(`KHÔNG mong đợi: giải mã được ${pdf.length} byte. Ghi lại vào VERIFICATION_LOG (T9).`);
     } catch (e) {
@@ -431,7 +433,7 @@ function OperatorConsole() {
   async function extendP3() {
     setExtend("PATCH /api/operator/papers/p3/review-until …");
     try {
-      const sevenDays = Math.floor(Date.now() / 1000) + 7 * 24 * 3600;
+      const sevenDays = new Date(Date.now() + 7 * 24 * 3_600_000).toISOString();
       const row = await api.operatorSetReviewUntil("p3", sevenDays);
       setExtend(`đã sửa DB: review_until = ${row.review_until ?? sevenDays}. Backend không còn chặn p3 — nhưng người phản biện vẫn không giải mã được: ORK kiểm tra expiry trong policy đã ký bằng threshold (T16).`);
     } catch (e) {

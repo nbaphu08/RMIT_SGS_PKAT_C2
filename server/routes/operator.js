@@ -34,6 +34,16 @@ router.get('/operator/blob/:id', requireRole('ps-operator'), (req, res) => {
   res.type('application/octet-stream').send(bytes);
 });
 
+// Operator đọc được bảng policies trong DB của chính mình. Cố ý mở để T9 đi tới ORK:
+// có ciphertext + policy trong tay mà vẫn bị mạng ORK từ chối giải mã.
+router.get('/operator/policy/:id', requireRole('ps-operator'), (req, res) => {
+  const rows = db
+    .prepare(`select subject_kind, subject, policy from policies where paper_id = ? and record = 'doc'`)
+    .all(req.params.id);
+  audit(req.auth.sub, 'GET operator policy', `doc:${req.params.id}`, '200 (by design)');
+  res.json({ policies: rows });
+});
+
 // CỐ Ý cho Operator "gia hạn" trong DB: backend sẽ trả ciphertext, nhưng ORK vẫn từ chối
 // vì hạn nằm trong policy đã ký bằng threshold (T16, mục 3.4).
 router.patch('/operator/papers/:id/review-until', requireRole('ps-operator'), (req, res) => {

@@ -142,3 +142,11 @@ test('operator console: storage là ciphertext, không phải PDF', async () => 
   assert.equal(await blob.text(), CIPHERTEXT);
   assert.equal((await reviewer.fetch('/api/operator/blob/p2')).status, 403);
 });
+
+test('operator đọc được policy trong DB (T9 cần cả ciphertext lẫn policy để đi tới ORK)', async () => {
+  assert.equal((await author.fetch('/api/operator/policy/p2')).status, 403);
+  const res = await operator.fetch('/api/operator/policy/p2');
+  assert.equal(res.status, 200);
+  const { policies } = await res.json();
+  assert.ok(Array.isArray(policies) && policies.length >= 1);
+});

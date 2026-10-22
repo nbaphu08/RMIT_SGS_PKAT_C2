@@ -53,6 +53,8 @@ export const api = {
   /** -> { dir, files: [{ name, size, head_hex, is_pdf }] } */
   operatorStorage: () => json("/api/operator/storage"),
   operatorBlob: (paperId) => text(`/api/operator/blob/${paperId}`),
+  /** Operator đọc thẳng bảng policies (cố ý, T9) -> [{ subject_kind, subject, policy }] */
+  operatorPolicies: async (paperId) => (await json(`/api/operator/policy/${paperId}`)).policies,
   /** Operator sửa hạn trong DB — cố ý mở, phục vụ T16 */
   operatorSetReviewUntil: (paperId, reviewUntil) =>
     patchJson(`/api/operator/papers/${paperId}/review-until`, { review_until: reviewUntil }),
