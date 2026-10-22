@@ -1,3 +1,7 @@
 node_modules/
 dist/
 public/tidecloak.json
+.tide-pack/
+.env
+server/data/
+data/
