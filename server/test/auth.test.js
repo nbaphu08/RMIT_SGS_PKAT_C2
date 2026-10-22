@@ -1,9 +1,9 @@
 // T1 [MOCK]: requireAuth phải chặn mọi cách trình token không đúng.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attackerKeys, identity, ownerRoles } from './helpers.mjs';
+import { attackerKeys, identity, authorRoles } from './helpers.mjs';
 
-const owner = await identity({ realmRoles: ownerRoles, username: 'owner' });
+const owner = await identity({ realmRoles: authorRoles, username: 'owner' });
 
 test('token + proof hợp lệ → 200 và trả roles', async () => {
   const res = await owner.fetch('/api/me');
@@ -11,7 +11,7 @@ test('token + proof hợp lệ → 200 và trả roles', async () => {
   const me = await res.json();
   assert.equal(me.sub, owner.sub);
   assert.equal(me.tideuserkey, owner.tideuserkey);
-  assert.deepEqual(me.roles, ownerRoles);
+  assert.deepEqual(me.roles, authorRoles);
   assert.equal(me.is_approver, false);
 });
 

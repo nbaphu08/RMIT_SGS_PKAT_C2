@@ -15,7 +15,7 @@ export const realmKeys = await generateKeyPair('EdDSA', { crv: 'Ed25519', extrac
 export const attackerKeys = await generateKeyPair('EdDSA', { crv: 'Ed25519', extractable: true });
 const realmJwk = { ...(await exportJWK(realmKeys.publicKey)), kid: 'test-realm', alg: 'EdDSA', use: 'sig' };
 
-process.env.US_DATA_DIR = mkdtempSync(join(tmpdir(), 'unreleased-test-'));
+process.env.US_DATA_DIR = mkdtempSync(join(tmpdir(), 'papersec-test-'));
 process.env.CLIENT_ADAPTER = JSON.stringify({
   realm: REALM,
   'auth-server-url': AUTH_SERVER,
@@ -33,7 +33,7 @@ server.unref();
 export const baseUrl = `http://127.0.0.1:${server.address().port}`;
 
 const APPROVER = { 'realm-management': { roles: ['tide-realm-admin'] } };
-export const ownerRoles = ['_tide_encryptor', '_tide_decryptor', 'us-owner'];
+export const authorRoles = ['_tide_encryptor', '_tide_decryptor', 'ps-author'];
 
 /** Một danh tính: giữ khóa DPoP riêng, tự mint token và tự ký proof cho mỗi request. */
 export async function identity({ realmRoles = [], approver = false, username = 'user' } = {}) {

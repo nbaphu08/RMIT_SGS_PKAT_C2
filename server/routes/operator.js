@@ -1,28 +1,28 @@
 import { Router } from 'express';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { BLOB_DIR, audit } from '../db.js';
+import { BLOB_DIR, audit, db } from '../db.js';
 import { requireRole } from '../auth.js';
-import { blobPath } from './tracks.js';
+import { blobPath } from './papers.js';
 
 const router = Router();
 
-// Operator có toàn quyền trên storage — và màn Operator Console chứng minh như vậy vẫn không đủ.
-router.get('/operator/storage', requireRole('us-operator'), (req, res) => {
+// Operator có toàn quyền trên storage và DB — Operator Console chứng minh như vậy vẫn không đủ.
+router.get('/operator/storage', requireRole('ps-operator'), (req, res) => {
   const files = readdirSync(BLOB_DIR).map((name) => {
     const head = readFileSync(join(BLOB_DIR, name)).subarray(0, 64);
     return {
       name,
       size: statSync(join(BLOB_DIR, name)).size,
       head_hex: head.toString('hex'),
-      is_wav: head.subarray(0, 4).toString('latin1') === 'RIFF',
+      is_pdf: head.subarray(0, 4).toString('latin1') === '%PDF',
     };
   });
   audit(req.auth.sub, 'GET storage', null, '200');
   res.json({ dir: 'server/data/blobs', files });
 });
 
-router.get('/operator/blob/:id', requireRole('us-operator'), (req, res) => {
+router.get('/operator/blob/:id', requireRole('ps-operator'), (req, res) => {
   const path = blobPath(req.params.id);
   let bytes;
   try {
@@ -30,8 +30,24 @@ router.get('/operator/blob/:id', requireRole('us-operator'), (req, res) => {
   } catch {
     return res.status(404).json({ error: 'not uploaded yet' });
   }
-  audit(req.auth.sub, 'GET operator blob', `trk:${req.params.id}`, '200 (by design)');
+  audit(req.auth.sub, 'GET operator blob', `doc:${req.params.id}`, '200 (by design)');
   res.type('application/octet-stream').send(bytes);
+});
+
+// CỐ Ý cho Operator "gia hạn" trong DB: backend sẽ trả ciphertext, nhưng ORK vẫn từ chối
+// vì hạn nằm trong policy đã ký bằng threshold (T16, mục 3.4).
+router.patch('/operator/papers/:id/review-until', requireRole('ps-operator'), (req, res) => {
+  const { id } = req.params;
+  if (!db.prepare(`select 1 from papers where id = ?`).get(id)) {
+    return res.status(404).json({ error: 'no such paper' });
+  }
+  const { review_until: reviewUntil } = req.body ?? {};
+  if (typeof reviewUntil !== 'string' || Number.isNaN(Date.parse(reviewUntil))) {
+    return res.status(400).json({ error: 'review_until must be an ISO date string' });
+  }
+  db.prepare(`update papers set review_until = ? where id = ?`).run(reviewUntil, id);
+  audit(req.auth.sub, 'PATCH review_until', `doc:${id}`, '200 (by design)');
+  res.json({ id, review_until: reviewUntil });
 });
 
 export default router;
