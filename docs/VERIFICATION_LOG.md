@@ -105,3 +105,21 @@ Không dán vào file này: token, DPoP proof, policy bytes, mật khẩu, email
 
 **Chưa chạy (chặn):** `finalize.sh` — cả 5 user vẫn `tideUserKey` rỗng (chưa ai mở invite link).
 Do đó T1, T2, T3 vẫn TRỐNG.
+
+### 2026-10-22 — Liên kết tài khoản Tide: bị chặn bởi giới hạn licence
+
+Đọc lại từ server (`tideUserKey`): **owner đã liên kết**; reviewer, operator, approver2, approver3 **chưa**.
+
+Ba lỗi gặp theo thứ tự, mỗi lỗi che lỗi sau:
+
+| Triệu chứng trên trình duyệt | Nguyên nhân thật (log TideCloak / trang ORK) |
+|---|---|
+| "We are sorry… Invalid parameter: redirect_uri" | Chỉ là hậu quả. Log: `LinkTideAccount: Could not Link Tide Account: Tide account already linked` → `rejected_by_user` → Keycloak quay về `/account/?error=access_denied&iss=…` và tự từ chối vì tham số `iss` bị cấm |
+| (cùng trang trên) | Dùng lại tài khoản Tide đã gắn với owner. **Mỗi tài khoản Tide chỉ gắn được một user trong realm** → cần 5 tài khoản Tide khác nhau |
+| ORK "Create an account": *"This action isn't available on your current plan — … hit its user limit"* | **Licence của realm chạm giới hạn số tài khoản Tide liên kết** sau user đầu tiên. Đổi tên/email không qua được |
+
+Sửa lại câu hỏi mở số 2 (mục 8): "tạo 5 user không bị chặn" chỉ đúng với **user Keycloak**. Giới hạn licence
+tính trên **tài khoản Tide được liên kết**, và hiện chỉ có 1/5.
+
+**Trạng thái:** đã nhờ BTC/đội Tide nâng giới hạn lên ≥ 5. **Không chạy `finalize.sh`** khi chưa đủ 5 người liên kết
+(mục 8, G1): ngưỡng sẽ sai và không đảo ngược được. T1–T16 vẫn TRỐNG.
