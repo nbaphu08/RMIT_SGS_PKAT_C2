@@ -30,7 +30,7 @@ ROLES_reviewer="_tide_encryptor _tide_decryptor"
 ROLES_operator="us-operator"          # CỐ Ý không có _tide_decryptor (plan mục 3.4)
 ROLES_approver2=""
 ROLES_approver3=""
-REALM_ADMINS="operator approver2 approver3"
+REALM_ADMINS="owner approver2 approver3"
 
 [ -n "$KC_BOOTSTRAP_ADMIN_PASSWORD" ] || {
   echo "ERROR: KC_BOOTSTRAP_ADMIN_PASSWORD chưa đặt trong .env." >&2; exit 1; }

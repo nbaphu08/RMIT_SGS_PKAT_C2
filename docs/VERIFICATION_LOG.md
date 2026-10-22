@@ -84,3 +84,24 @@ Không dán vào file này: token, DPoP proof, policy bytes, mật khẩu, email
 | 2 | Free tier giới hạn mấy user? | Tạo 5 user **không bị chặn** |
 | 3 | QEA có chạy Tide mode? | **Có**: `iga.attestor=tide`, `iga-status` → `{"enabled":true}` |
 | 4 | Phiên bản server để khớp npm? | Keycloak 26.7.5; jar Tide là `1.0-SNAPSHOT` → **không đối chiếu được** với `0.14.x` của npm. Nếu login lỗi lạ, đây là nghi phạm đầu tiên |
+
+### 2026-10-22 — M-A (Papersec) bước 1–3
+
+`bash scripts/tide/pivot.sh` (realm còn firstAdmin, chưa ai liên kết Tide). Kết quả đọc lại từ server:
+
+| User | Realm role sau pivot |
+|---|---|
+| owner | `_tide_encryptor`, `_tide_decryptor`, `ps-author`, `default-roles-unreleased` |
+| approver2 | `_tide_encryptor`, `_tide_decryptor`, `ps-author`, `default-roles-unreleased` |
+| approver3 | `_tide_encryptor`, `_tide_decryptor`, `ps-author`, `default-roles-unreleased` |
+| reviewer | `_tide_encryptor`, `_tide_decryptor`, `ps-paper-p3-reader`, `default-roles-unreleased` |
+| operator | `ps-operator`, `default-roles-unreleased` (không có `_tide_*`) |
+
+- Realm role mới: `ps-author`, `ps-operator`, `ps-paper-p1-reader`, `ps-paper-p2-reader`, `ps-paper-p3-reader`.
+- Đã xóa role cũ: `us-owner`, `us-operator`, `us-trk-t1/t2/t3-reviewer`. `PENDING` = 0 sau drain.
+- `REALM_ADMINS` trong `scripts/tide/common.sh` đổi `operator approver2 approver3` → **`owner approver2 approver3`** (plan v4 D6).
+- `node scripts/make-sample-papers.mjs` → `samples/p1.pdf` 1,81 MB / 220 trang, `p2.pdf` 2,14 MB / 260 trang,
+  `p3.pdf` 1,48 MB / 180 trang. Header `%PDF-1.4`; `qlmanage` render được trang 1 (PDF hợp lệ). `samples/` đã gitignore.
+
+**Chưa chạy (chặn):** `finalize.sh` — cả 5 user vẫn `tideUserKey` rỗng (chưa ai mở invite link).
+Do đó T1, T2, T3 vẫn TRỐNG.

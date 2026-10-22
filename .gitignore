@@ -5,3 +5,4 @@ public/tidecloak.json
 .env
 server/data/
 data/
+samples/
