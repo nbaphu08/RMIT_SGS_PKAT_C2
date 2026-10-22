@@ -22,41 +22,49 @@ async function request(path, init = {}) {
 
 const json = async (path, init) => (await request(path, init)).json();
 const text = async (path, init) => (await request(path, init)).text();
-const postJson = (path, body) =>
-  json(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const sendJson = (method) => (path, body) =>
+  json(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+const postJson = sendJson("POST");
+const patchJson = sendJson("PATCH");
 
 export const api = {
-  /** -> { sub, tideuserkey, username, roles, is_approver } */
+  /** -> { sub, tideuserkey, username, roles } */
   me: () => json("/api/me"),
-  /** -> [{ id, title, blob_size, updated_at }] */
-  tracks: async () => (await json("/api/tracks")).tracks,
+  /** Tác giả: cả 3; người khác: chỉ paper có role reader -> [{ id, code_title, review_until, blob_size, updated_at }] */
+  papers: async () => (await json("/api/papers")).papers,
   /** Chỉ trả policy khớp người gọi -> [{ subject_kind, subject, policy }] */
-  policies: async (trackId, record) => (await json(`/api/tracks/${trackId}/policy?for=${record}`)).policies,
-  savePolicy: (trackId, body) => postJson(`/api/tracks/${trackId}/policies`, body),
-  putBlob: (trackId, ciphertext) =>
-    json(`/api/tracks/${trackId}/blob`, {
+  policies: async (paperId, record) => (await json(`/api/papers/${paperId}/policy?for=${record}`)).policies,
+  savePolicy: (paperId, body) => postJson(`/api/papers/${paperId}/policies`, body),
+  putBlob: (paperId, ciphertext) =>
+    json(`/api/papers/${paperId}/blob`, {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
       body: ciphertext,
     }),
-  getBlob: (trackId) => text(`/api/tracks/${trackId}/blob`),
-  postFeedback: (trackId, ciphertext) => postJson(`/api/tracks/${trackId}/feedback`, { ciphertext }),
+  getBlob: (paperId) => text(`/api/papers/${paperId}/blob`),
+  postFeedback: (paperId, ciphertext) => postJson(`/api/papers/${paperId}/feedback`, { ciphertext }),
   /** -> [{ id, ciphertext, created_at }] */
-  feedback: async (trackId) => (await json(`/api/tracks/${trackId}/feedback`)).feedback,
-  share: (trackId, reviewer) => postJson(`/api/tracks/${trackId}/shares`, { reviewer }),
-  /** -> { dir, files: [{ name, size, head_hex, is_wav }] } */
+  feedback: async (paperId) => (await json(`/api/papers/${paperId}/feedback`)).feedback,
+  /** Ghi lời mời + change_request_id (chỉ để hiển thị; quyền thật do QEA quyết) */
+  invite: (paperId, body) => postJson(`/api/papers/${paperId}/invites`, body),
+  /** -> { dir, files: [{ name, size, head_hex, is_pdf }] } */
   operatorStorage: () => json("/api/operator/storage"),
-  operatorBlob: (trackId) => text(`/api/operator/blob/${trackId}`),
+  operatorBlob: (paperId) => text(`/api/operator/blob/${paperId}`),
+  /** Operator sửa hạn trong DB — cố ý mở, phục vụ T16 */
+  operatorSetReviewUntil: (paperId, reviewUntil) =>
+    patchJson(`/api/operator/papers/${paperId}/review-until`, { review_until: reviewUntil }),
 };
 
 /** Chỉ có một policy khớp mỗi record; lấy cái đầu tiên, báo rõ nếu chưa ký. */
-export async function policyFor(trackId, record) {
-  const [first] = await api.policies(trackId, record);
-  if (!first) throw new Error(`chưa có policy ${record}:${trackId} cho người này — approver phải ký trước (M2)`);
+export async function policyFor(paperId, record) {
+  const [first] = await api.policies(paperId, record);
+  if (!first) {
+    throw new Error(`chưa có policy ${record}:${paperId} cho người này — một tác giả phải ký trước (tab Ký policy)`);
+  }
   return first.policy;
 }
 
-/** Lỗi từ mạng ORK: thông điệp thật của contract nằm trong `cause` (plan mục 9). Không retry. */
+/** Lỗi từ mạng ORK: thông điệp thật của contract nằm trong `cause` (plan mục 10). Không retry. */
 export function describeError(err) {
   if (err instanceof ApiError) return err.message;
   const cause = err?.cause;

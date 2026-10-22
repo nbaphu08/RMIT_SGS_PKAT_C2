@@ -1,5 +1,5 @@
 // relationship.js — chép từ .tide-pack/templates/relationship-attestation/relationship.ts,
-// bỏ kiểu TypeScript và thêm đường đi cho Uint8Array (audio nhị phân, plan mục 5.1).
+// bỏ kiểu TypeScript và thêm đường đi cho Uint8Array (PDF nhị phân, plan mục 5.1).
 //
 // Dùng contract có sẵn của ORK `RelationshipAttestation:1`: policy nói ai (User/Group/Role) được
 // encrypt/decrypt dữ liệu gắn đúng MỘT tag = recordId. Không viết contract mới.
@@ -137,7 +137,7 @@ export async function signRelationshipPolicy(grant, adminPolicy) {
 // Lỗi từ mạng ném nguyên văn: hiện ra, không thay thế.
 
 /**
- * @param {string|Uint8Array} data chuỗi, hoặc bytes (audio WAV) — plan mục 5.1.
+ * @param {string|Uint8Array} data chuỗi, hoặc bytes (PDF) — plan mục 5.1.
  * @returns {Promise<string>} ciphertext base64.
  */
 export async function encryptForRecord(data, recordId, signedPolicyB64) {
@@ -145,7 +145,7 @@ export async function encryptForRecord(data, recordId, signedPolicyB64) {
   return typeof out === "string" ? out : toBase64(out);
 }
 
-/** Giải mã ra bytes — dùng cho audio. */
+/** Giải mã ra bytes — dùng cho PDF. */
 export async function decryptBytesForRecord(encrypted, recordId, signedPolicyB64) {
   const [out] = await IAMService.doDecrypt([{ encrypted, tags: [recordId] }], fromBase64(signedPolicyB64));
   return typeof out === "string" ? new TextEncoder().encode(out) : new Uint8Array(out);
