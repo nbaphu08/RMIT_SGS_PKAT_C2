@@ -76,13 +76,29 @@ export function createRoleRequest(actor, username, role) {
   if ((state.roles[username] ?? []).includes(role)) {
     throw new Error(`${username} đã có ${role}`);
   }
+  return openRequest(state, { action: "GRANT_ROLE", username, role, createdBy: actor });
+}
+
+/**
+ * Tạo CR "gỡ <role> khỏi <username>" — thu hồi cũng đi qua quorum như cấp (plan mục 4 bước 7).
+ * Một người không tự thu hồi được, cũng như không tự cấp được.
+ */
+export function createRevokeRequest(actor, username, role) {
+  const state = read();
+  if (!(state.roles[username] ?? []).includes(role)) {
+    throw new Error(`${username} không có ${role}`);
+  }
+  return openRequest(state, { action: "REVOKE_ROLE", username, role, createdBy: actor });
+}
+
+function openRequest(state, { action, username, role, createdBy }) {
   const cr = {
-    id: `cr-${Date.now().toString(36)}`,
-    action: "GRANT_ROLE",
+    id: `cr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    action,
     username,
     role,
-    createdBy: actor,
-    approvals: isAdmin(actor) ? [actor] : [],
+    createdBy,
+    approvals: isAdmin(createdBy) ? [createdBy] : [],
     status: "PENDING",
   };
   state.changeRequests = [cr, ...state.changeRequests];
@@ -113,19 +129,11 @@ function commitIfReady(state, cr) {
   if (cr.approvals.length < QUORUM) return;
   cr.status = "APPLIED";
   const roles = state.roles[cr.username] ?? [];
-  if (!roles.includes(cr.role)) state.roles[cr.username] = [...roles, cr.role];
-}
-
-/** Thu hồi: gỡ role, cũng phải qua quorum. Dùng cho T10 (thu hồi chặn truy cập về sau). */
-export function revokeRole(actor, username, role) {
-  if (!isAdmin(actor)) {
-    const err = new Error("403: không có tide-realm-admin");
-    err.status = 403;
-    throw err;
+  if (cr.action === "REVOKE_ROLE") {
+    state.roles[cr.username] = roles.filter((r) => r !== cr.role);
+  } else if (!roles.includes(cr.role)) {
+    state.roles[cr.username] = [...roles, cr.role];
   }
-  const state = read();
-  state.roles[username] = (state.roles[username] ?? []).filter((r) => r !== role);
-  write(state);
 }
 
 export function resetRealm() {
@@ -147,21 +155,34 @@ export const getSession = () => {
   }
 };
 
-/** Cấp token mới cho tab này: chụp role hiện tại của realm. */
-export function mintToken(username) {
-  const token = { username, roles: rolesOf(username), issuedAt: Date.now() };
+// Realm thật đo được accessTokenLifespan = 600s (VERIFICATION_LOG). Token hết hạn là lý do
+// thu hồi quyền có độ trễ: quyền bị gỡ chỉ chặn ở lần cấp token SAU (T10).
+export const TOKEN_TTL_MS = 600_000;
+
+/** Cấp token mới cho tab này: chụp role hiện tại của realm, kèm hạn sống. */
+export function mintToken(username, now = Date.now()) {
+  const token = { username, roles: rolesOf(username), issuedAt: now, expiresAt: now + TOKEN_TTL_MS };
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(token));
   return token;
 }
+
+/** Token quá hạn → backend trả 401, người dùng phải đăng nhập/refresh lại (như JWT thật). */
+export const tokenExpired = (token, now = Date.now()) =>
+  Boolean(token?.expiresAt && now > token.expiresAt);
 
 export const clearSession = () => sessionStorage.removeItem(SESSION_KEY);
 
 /** Token của tab hiện tại — api.preview.js đọc để kiểm quyền, như backend đọc JWT. */
 export const currentToken = () => getSession();
 
-/** Role trong realm đã khác role trong token chưa? Dùng để nhắc "bấm Refresh token". */
+/**
+ * Role trong realm đã khác role trong token chưa? Dùng để nhắc "bấm Refresh token".
+ * Lệch theo CẢ HAI chiều: vừa được cấp thêm, hoặc vừa bị thu hồi (T10).
+ */
 export function tokenIsStale(token) {
   if (!token) return false;
   const live = rolesOf(token.username);
-  return live.length !== token.roles.length || live.some((r) => !token.roles.includes(r));
+  return live.length !== token.roles.length
+    || live.some((r) => !token.roles.includes(r))
+    || token.roles.some((r) => !live.includes(r));
 }

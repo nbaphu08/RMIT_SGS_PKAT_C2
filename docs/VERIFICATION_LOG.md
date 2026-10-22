@@ -150,3 +150,21 @@ Mã nguồn thật không bị sửa dòng nào — `vite.config.js` chỉ đổ
 
 **Trạng thái:** owner 1/5 đã liên kết thật. T1–T16 trên Tide thật vẫn TRỐNG; chưa chạy
 `finalize.sh`. Vẫn thử liên kết thật song song khi mạng Tide ổn định.
+
+### 2026-10-22 — T10 (thu hồi) trên bản mô phỏng Plan C
+
+Đã làm thu hồi quyền đi qua **đúng quorum như khi cấp** (`REVOKE_ROLE` change request, 2/3).
+Đo được trên bản mô phỏng (`npm run test:sim`, 34 test):
+
+| Điều kiện | Kết quả |
+|---|---|
+| 1/2 phiếu duyệt thu hồi | role **vẫn còn** |
+| 2/2 phiếu | role bị gỡ |
+| Operator tạo CR thu hồi | 0 phiếu; Operator tự duyệt → `403` |
+| Token đã cấp TRƯỚC khi thu hồi | **vẫn đọc được** cho tới khi hết hạn |
+| Token cấp SAU khi thu hồi | `403` |
+| Token quá `TOKEN_TTL_MS` (600s, khớp `accessTokenLifespan` đo ở realm thật) | `401` |
+
+**Độ trễ thu hồi = vòng đời token**, ở đây là 600 giây. Đây là con số T10 hỏi, nhưng mới đo trên
+bản mô phỏng; trên Tide thật vẫn TRỐNG. README và kịch bản demo nói rõ: thu hồi chặn truy cập
+**về sau**, không thu hồi được bản PDF người ta đã xem.

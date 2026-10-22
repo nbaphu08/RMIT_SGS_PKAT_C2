@@ -9,11 +9,15 @@ import {
   QUORUM,
   approveRequest,
   changeRequests,
+  IDENTITIES as ALL_IDENTITIES,
   clearSession,
+  createRevokeRequest,
   currentToken,
   isAdmin,
   mintToken,
   resetRealm,
+  rolesOf,
+  tokenExpired,
   tokenIsStale,
   subscribe,
 } from "./realm.js";
@@ -40,6 +44,7 @@ export function TideCloakContextProvider({ children }) {
       username,
       token,
       stale: tokenIsStale(token),
+      expired: tokenExpired(token),
       login: () => setPicking(true),
       logout: () => { clearSession(); setToken(null); },
       forceRefreshToken: async () => setToken(username ? mintToken(username) : null),
@@ -53,7 +58,7 @@ export function TideCloakContextProvider({ children }) {
 
   return (
     <Ctx.Provider value={value}>
-      <PlanCBadge stale={value.stale} onOpenConsole={() => setConsole(true)} />
+      <PlanCBadge stale={value.stale} expired={value.expired} onOpenConsole={() => setConsole(true)} />
       {children}
       {picking && <IdentityPicker onPick={signIn} onClose={() => setPicking(false)} />}
       {console_ && <ApprovalsConsole actor={username} tick={realmTick} onClose={() => setConsole(false)} />}
@@ -88,7 +93,7 @@ export function Unauthenticated({ children }) {
 
 // --- Giao diện riêng của bản mô phỏng ----------------------------------------------------------
 
-function PlanCBadge({ stale, onOpenConsole }) {
+function PlanCBadge({ stale, expired, onOpenConsole }) {
   return (
     <div style={badge.wrap}>
       <span style={badge.pill}>
@@ -97,7 +102,8 @@ function PlanCBadge({ stale, onOpenConsole }) {
       <button type="button" style={{ ...badge.pill, ...badge.button }} onClick={onOpenConsole}>
         QEA Approvals
       </button>
-      {stale && <span style={{ ...badge.pill, ...badge.warn }}>Role đã đổi — bấm Refresh token</span>}
+      {expired && <span style={{ ...badge.pill, ...badge.warn }}>Token hết hạn — bấm Refresh token</span>}
+      {!expired && stale && <span style={{ ...badge.pill, ...badge.warn }}>Role đã đổi — bấm Refresh token</span>}
     </div>
   );
 }
@@ -110,14 +116,21 @@ function ApprovalsConsole({ actor, onClose }) {
   const [error, setError] = useState("");
   const crs = changeRequests();
 
-  function approve(id) {
+  const run = (fn) => {
     setError("");
     try {
-      approveRequest(actor, id);
+      fn();
     } catch (e) {
       setError(e.message);
     }
-  }
+  };
+
+  // Role đọc paper đang có hiệu lực — nguồn để thu hồi (plan mục 4 bước 7, T10).
+  const granted = Object.keys(ALL_IDENTITIES).flatMap((username) =>
+    rolesOf(username)
+      .filter((r) => r.startsWith("ps-paper-"))
+      .map((role) => ({ username, role })),
+  );
 
   return (
     <div style={picker.backdrop} onClick={onClose}>
@@ -132,7 +145,7 @@ function ApprovalsConsole({ actor, onClose }) {
         {crs.length === 0 && <p style={picker.lede}>Chưa có change request nào. Vào tab Author Workspace, bấm "Mời phản biện" để tạo.</p>}
         {crs.map((cr) => (
           <div key={cr.id} style={picker.row}>
-            <strong>{cr.role} → {cr.username}</strong>
+            <strong>{cr.action === "REVOKE_ROLE" ? "GỠ" : "GÁN"} {cr.role} → {cr.username}</strong>
             <span style={{ ...picker.user, color: cr.status === "APPLIED" ? "#15803d" : "#b45309" }}>
               {cr.status} · {cr.approvals.length}/{QUORUM}
             </span>
@@ -141,10 +154,30 @@ function ApprovalsConsole({ actor, onClose }) {
               {cr.approvals.length > 0 && ` · đã duyệt: ${cr.approvals.join(", ")}`}
             </span>
             {cr.status === "PENDING" && (
-              <button type="button" style={{ ...picker.approve, gridColumn: "1 / -1" }} onClick={() => approve(cr.id)}>
+              <button type="button" style={{ ...picker.approve, gridColumn: "1 / -1" }} onClick={() => run(() => approveRequest(actor, cr.id))}>
                 Duyệt với tư cách {actor}
               </button>
             )}
+          </div>
+        ))}
+
+        <h3 style={{ ...picker.title, fontSize: 15, marginTop: 8 }}>Thu hồi quyền</h3>
+        <p style={picker.lede}>
+          Gỡ role cũng phải qua {QUORUM}/3 như khi cấp. Thu hồi chặn truy cập <strong>về sau</strong>:
+          token đã cấp vẫn dùng được đến khi hết hạn (10 phút), và bản đã xem thì không lấy lại được.
+        </p>
+        {granted.length === 0 && <p style={picker.lede}>Chưa ai có role đọc paper.</p>}
+        {granted.map(({ username, role }) => (
+          <div key={`${username}:${role}`} style={picker.row}>
+            <strong>{role}</strong>
+            <span style={picker.user}>{username}</span>
+            <button
+              type="button"
+              style={{ ...picker.approve, gridColumn: "1 / -1", background: "#b91c1c" }}
+              onClick={() => run(() => createRevokeRequest(actor, username, role))}
+            >
+              Yêu cầu thu hồi (tạo CR)
+            </button>
           </div>
         ))}
         <button

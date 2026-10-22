@@ -79,7 +79,8 @@ Mỗi **tab** là một người (thay cho 5 Chrome profile ở bản thật). M
 | Governance | `src/lib/mock/realm.js` | Change request cần **2/3** tác giả duyệt; Operator duyệt bị `403` | TideCloak + QEA Approvals |
 | Mật mã | `src/lib/mock/ork.js` | Policy đã "ký" mang `subject` + `recordId` + `expiry`; mọi lần giải mã đều kiểm lại | Mạng ORK, chữ ký ngưỡng |
 | Dữ liệu server | `src/lib/mock/db.js` | Operator sửa được thoải mái — và vẫn không mở được paper | SQLite + ổ đĩa |
-| Đăng nhập | `src/lib/mock/tidecloak-react.jsx` | Token **chụp role lúc cấp**: role mới phải bấm Refresh token | JWT do Tide ký, DPoP |
+| Đăng nhập | `src/lib/mock/tidecloak-react.jsx` | Token **chụp role lúc cấp**, hạn 10 phút: role mới phải bấm Refresh token | JWT do Tide ký, DPoP, `accessTokenLifespan` 600s |
+| Thu hồi | `src/lib/mock/realm.js` | Gỡ role cũng cần **2/3**; chặn từ token kế tiếp (T10) | Change request trong tide-console |
 
 **Thành thật về giới hạn:** chữ ký ngưỡng và mã hóa trong `ork.js` là mô phỏng — chúng chứng minh
 *luật* (đúng paper, đúng hạn, đúng role, policy sửa là hỏng), **không** chứng minh mật mã. Toàn bộ
@@ -91,7 +92,7 @@ sửa một dòng nào** cho bản mô phỏng: `vite.config.js` chỉ đổi h�
 
 ```bash
 npm test         # 27 test backend thật (JWT/DPoP tự sinh)
-npm run test:sim #  7 test luật của mạng ORK mô phỏng (sai paper, hết hạn, policy bị sửa…)
+npm run test:sim # 34 test luật mô phỏng: quyền, quorum 2/3, thu hồi, hết hạn, ORK
 ```
 
 ---

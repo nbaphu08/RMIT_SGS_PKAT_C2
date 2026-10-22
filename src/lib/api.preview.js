@@ -5,7 +5,7 @@
 // bảng `papers` trong db.js cũng không tự cấp quyền cho mình được — đúng như backend thật (T14).
 import { audit, getBlob, listBlobs, putBlob, read, update } from "./mock/db.js";
 import { ADMIN_ROLE, denyReason, hasAuthorRole, hasReaderRole } from "../../shared/authz.js";
-import { currentToken } from "./mock/realm.js";
+import { currentToken, tokenExpired } from "./mock/realm.js";
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -20,6 +20,9 @@ const delay = (ms = 120) => new Promise((r) => setTimeout(r, ms));
 function auth() {
   const token = currentToken();
   if (!token) throw new ApiError(401, "missing Authorization header");
+  // Token quá hạn là 401, không phải 403: đây là lý do thu hồi quyền có độ trễ bằng đúng
+  // vòng đời token — quyền bị gỡ chỉ chặn từ lần cấp token sau (T10).
+  if (tokenExpired(token)) throw new ApiError(401, "token expired");
   return token;
 }
 

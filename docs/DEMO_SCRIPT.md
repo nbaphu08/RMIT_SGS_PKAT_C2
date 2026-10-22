@@ -66,6 +66,16 @@ Làm theo phần "Chuẩn bị" bên dưới.
 
 1. **Phòng tác giả** → thẻ p1 → **Đọc nhận xét** → nhận xét của reviewer hiện ra.
 
+## Cảnh 7: Thu hồi quyền (30 giây) — tuỳ thời lượng
+
+1. Bấm **QEA Approvals** → mục **Thu hồi quyền** → ở dòng `ps-paper-p1-reader → reviewer` bấm
+   **Yêu cầu thu hồi**. CR mới hiện ra, PENDING 1/2.
+2. Đăng nhập **approver3** ở tab khác → duyệt → **APPLIED**.
+3. Về tab **reviewer**: bấm **Refresh token** → mở p1 → **403**.
+
+> "Thu hồi chặn truy cập về sau. Nhưng nói thẳng: token đang cầm vẫn chạy đến khi hết hạn, và bản
+> PDF đã xem thì không lấy lại được. Không hệ thống nào làm được điều đó."
+
 ## Lời kết (20 giây)
 
 > "Thu hồi chặn được truy cập về sau, nhưng không lấy lại được bản đã xem, và trình xem PDF vẫn cho tải về. Chúng tôi nói rõ điều đó trong README. Điều Papersec bảo đảm là: không một cá nhân nào, kể cả nền tảng, tự mình mở, gia hạn hay làm lộ bản thảo."

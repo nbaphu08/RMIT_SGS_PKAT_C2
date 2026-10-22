@@ -163,3 +163,38 @@ test('paper không tồn tại → 404', async () => {
   assert.equal(await status(() => api.getBlob('p9')), 404);
   assert.equal(await status(() => api.putBlob('p9', CIPHERTEXT)), 404);
 });
+
+test('T10: thu hồi chặn truy cập VỀ SAU, không chặn token đang cầm', async () => {
+  as('owner');
+  await api.putBlob('p1', CIPHERTEXT);
+  const grant = realm.createRoleRequest('owner', 'reviewer', 'ps-paper-p1-reader');
+  realm.approveRequest('approver2', grant.id);
+
+  as('reviewer');
+  assert.equal(await api.getBlob('p1'), CIPHERTEXT, 'đọc được sau khi 2/3 duyệt');
+
+  // 2/3 duyệt thu hồi — nhưng người phản biện vẫn đang cầm token cũ.
+  const revoke = realm.createRevokeRequest('owner', 'reviewer', 'ps-paper-p1-reader');
+  realm.approveRequest('approver3', revoke.id);
+
+  assert.equal(
+    await api.getBlob('p1'),
+    CIPHERTEXT,
+    'token cũ vẫn chạy đến khi hết hạn — đây là độ trễ thật, README nói rõ',
+  );
+
+  as('reviewer'); // token mới (refresh, hoặc token cũ hết hạn sau 10 phút)
+  assert.equal(await status(() => api.getBlob('p1')), 403, 'từ đây trở đi thì chặn');
+});
+
+test('token hết hạn → 401 (không phải 403)', async () => {
+  const token = as('owner');
+  assert.equal(await status(() => api.papers()), 200);
+
+  // Giả lập 10 phút trôi qua: ghi đè token bằng bản đã quá hạn.
+  sessionStorage.setItem(
+    'papersec.session.v1',
+    JSON.stringify({ ...token, expiresAt: Date.now() - 1 }),
+  );
+  assert.equal(await status(() => api.papers()), 401);
+});
