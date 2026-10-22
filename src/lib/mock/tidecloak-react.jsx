@@ -112,6 +112,9 @@ function PlanCBadge({ stale, expired, onOpenConsole }) {
  * tide-console → QEA Approvals, mô phỏng. Ở bản thật đây là ứng dụng RIÊNG của TideCloak, không
  * phải Papersec — nên nó nằm ngoài App.jsx, đúng ranh giới thật (plan mục 4 bước 2).
  */
+/** Giá trị bất kỳ cũng được — signRelationshipPolicy mô phỏng không dùng tới nó. */
+const SIM_ADMIN_POLICY = "c2ltdWxhdGVkLWFkbWluLXBvbGljeQ==";
+
 function ApprovalsConsole({ actor, onClose }) {
   const [error, setError] = useState("");
   const crs = changeRequests();
@@ -160,6 +163,22 @@ function ApprovalsConsole({ actor, onClose }) {
             )}
           </div>
         ))}
+
+        <h3 style={{ ...picker.title, fontSize: 15, marginTop: 8 }}>Admin policy (cho tab Policy Signing)</h3>
+        <p style={picker.lede}>
+          Tab Policy Signing khoá nút Ký cho tới khi có admin policy — ở realm thật lấy từ
+          <code> /iga/role-policies</code>. Bản mô phỏng dùng chuỗi dưới đây: bấm để chép rồi dán vào ô đó.
+        </p>
+        <button
+          type="button"
+          style={{ ...picker.row, cursor: "copy", fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+          onClick={() => navigator.clipboard?.writeText(SIM_ADMIN_POLICY).then(
+            () => setError("Đã chép admin policy — dán vào tab Policy Signing"),
+            () => setError(`Không chép được, tự copy: ${SIM_ADMIN_POLICY}`),
+          )}
+        >
+          {SIM_ADMIN_POLICY}
+        </button>
 
         <h3 style={{ ...picker.title, fontSize: 15, marginTop: 8 }}>Thu hồi quyền</h3>
         <p style={picker.lede}>
