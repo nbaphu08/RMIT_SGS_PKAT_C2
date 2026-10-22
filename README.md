@@ -56,16 +56,51 @@ Không có Tide, khóa giải mã sẽ nằm trên server, và người giữ se
 
 ## Setup
 
-<!-- Sample Instructions -->
+Yêu cầu: Docker Desktop, Node.js ≥ 22.5 (dùng `node:sqlite`), `jq`, `curl`. Chạy trên macOS/Linux.
 
-<!-- Download the sourcecodes.zip from GitHub, unzip into a folder called fairenrol -->
-cd "fairenrol"
-<!-- Open Docker Desktop -->
-docker run -d -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=password tideorg/tidecloak-dev:latest
-<!-- Open http://localhost:8080/, create new app, set URIs, download tidecloak.json to the public folder -->
-<!-- Install all deps -->
-npm.cmd install
-npm.cmd run dev
-<!-- Open http://localhost:5173/ -->
-<!-- Click Login with TideCloak -->
-…
+### 1. Cài đặt
+
+```bash
+npm install
+cp .env.example .env
+```
+
+Điền `.env`: `TIDE_LICENSE_EMAIL` (email **của bạn** để quản lý licence Tide), `TIDE_TERMS_ACCEPTED=yes` **chỉ khi** bạn đã đọc và đồng ý https://tide.org/legal, và `KC_BOOTSTRAP_ADMIN_PASSWORD` (mật khẩu master admin, chỉ dùng local). `.env` đã nằm trong `.gitignore`.
+
+### 2. Dựng TideCloak và realm
+
+```bash
+bash scripts/tide/bootstrap.sh   # container TideCloak (port 8080), realm, client, licence, bật IGA
+bash scripts/tide/users.sh       # tạo 5 user: owner, approver2, approver3, reviewer, operator
+bash scripts/tide/pivot.sh       # gán role Papersec (ps-author, ps-operator, ps-paper-*-reader)
+bash scripts/tide/invite.sh      # in 5 link liên kết tài khoản Tide (sống 12 giờ)
+```
+
+Mở **từng** link trong một cửa sổ ẩn danh riêng và **tạo một tài khoản Tide mới cho mỗi user**. Một tài khoản Tide chỉ gắn được với một user, và licence phải cho phép đủ 5 tài khoản.
+
+### 3. Chuyển realm sang nhiều admin (một chiều)
+
+Chỉ chạy khi **cả 5** đã liên kết. Bước này gán `tide-realm-admin` cho 3 tác giả và **không hoàn tác được**:
+
+```bash
+CONFIRM_FLIP=yes bash scripts/tide/finalize.sh   # đồng thời xuất public/tidecloak.json
+```
+
+### 4. Chạy app
+
+```bash
+node scripts/make-sample-papers.mjs   # sinh 3 PDF tổng hợp vào samples/
+npm run server                        # backend: http://localhost:8787
+npm run dev                           # frontend: http://localhost:5137
+```
+
+Mở http://localhost:5137 và đăng nhập bằng Tide. Mỗi user dùng một Chrome profile riêng.
+
+### 5. Kiểm thử
+
+```bash
+npm test         # test backend (JWT/DPoP tự sinh — chỉ kiểm logic phân quyền, không phải tích hợp Tide)
+npm run build
+```
+
+Kết quả đo thật trên Tide được ghi trong [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md).
