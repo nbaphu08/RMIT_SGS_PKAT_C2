@@ -4,7 +4,20 @@
 // Điểm quan trọng: TOKEN CHỤP ROLE TẠI THỜI ĐIỂM CẤP. Role mới được quorum duyệt không tự vào
 // token — phải bấm "Refresh token", đúng như JWT thật (plan mục 4 bước 3).
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { IDENTITIES, clearSession, getSession, rolesOf, setSession, subscribe } from "./realm.js";
+import {
+  IDENTITIES,
+  QUORUM,
+  approveRequest,
+  changeRequests,
+  clearSession,
+  getSession,
+  isAdmin,
+  resetRealm,
+  rolesOf,
+  setSession,
+  subscribe,
+} from "./realm.js";
+import { resetDb } from "./db.js";
 
 const Ctx = createContext(null);
 
@@ -40,11 +53,14 @@ export function TideCloakContextProvider({ children }) {
     [username, token, realmTick, signIn],
   );
 
+  const [console_, setConsole] = useState(false);
+
   return (
     <Ctx.Provider value={value}>
-      <PlanCBadge stale={value.stale} />
+      <PlanCBadge stale={value.stale} onOpenConsole={() => setConsole(true)} />
       {children}
       {picking && <IdentityPicker onPick={signIn} onClose={() => setPicking(false)} />}
+      {console_ && <ApprovalsConsole actor={username} tick={realmTick} onClose={() => setConsole(false)} />}
     </Ctx.Provider>
   );
 }
@@ -86,13 +102,73 @@ export function currentToken() {
 
 // --- Giao diện riêng của bản mô phỏng ----------------------------------------------------------
 
-function PlanCBadge({ stale }) {
+function PlanCBadge({ stale, onOpenConsole }) {
   return (
     <div style={badge.wrap}>
       <span style={badge.pill}>
         SIMULATED TIDECLOAK · <a href="https://tide.org/unlocked/#plan-c" target="_blank" rel="noreferrer" style={badge.link}>Plan C</a>
       </span>
+      <button type="button" style={{ ...badge.pill, ...badge.button }} onClick={onOpenConsole}>
+        QEA Approvals
+      </button>
       {stale && <span style={{ ...badge.pill, ...badge.warn }}>Role đã đổi — bấm Refresh token</span>}
+    </div>
+  );
+}
+
+/**
+ * tide-console → QEA Approvals, mô phỏng. Ở bản thật đây là ứng dụng RIÊNG của TideCloak, không
+ * phải Papersec — nên nó nằm ngoài App.jsx, đúng ranh giới thật (plan mục 4 bước 2).
+ */
+function ApprovalsConsole({ actor, onClose }) {
+  const [error, setError] = useState("");
+  const crs = changeRequests();
+
+  function approve(id) {
+    setError("");
+    try {
+      approveRequest(actor, id);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  return (
+    <div style={picker.backdrop} onClick={onClose}>
+      <div style={{ ...picker.card, width: "min(620px, 94vw)" }} onClick={(e) => e.stopPropagation()}>
+        <h2 style={picker.title}>tide-console → QEA Approvals (mô phỏng)</h2>
+        <p style={picker.lede}>
+          Đang xem với tư cách <strong>{actor ?? "chưa đăng nhập"}</strong>
+          {actor && !isAdmin(actor) && " — không phải tide-realm-admin, bấm duyệt sẽ bị từ chối."}
+          {" "}Cần {QUORUM}/3 tác giả duyệt thì role mới được gán.
+        </p>
+        {error && <p style={{ ...picker.lede, color: "#b91c1c", margin: 0 }}>{error}</p>}
+        {crs.length === 0 && <p style={picker.lede}>Chưa có change request nào. Vào tab Author Workspace, bấm "Mời phản biện" để tạo.</p>}
+        {crs.map((cr) => (
+          <div key={cr.id} style={picker.row}>
+            <strong>{cr.role} → {cr.username}</strong>
+            <span style={{ ...picker.user, color: cr.status === "APPLIED" ? "#15803d" : "#b45309" }}>
+              {cr.status} · {cr.approvals.length}/{QUORUM}
+            </span>
+            <span style={picker.note}>
+              {cr.id} · tạo bởi {cr.createdBy}
+              {cr.approvals.length > 0 && ` · đã duyệt: ${cr.approvals.join(", ")}`}
+            </span>
+            {cr.status === "PENDING" && (
+              <button type="button" style={{ ...picker.approve, gridColumn: "1 / -1" }} onClick={() => approve(cr.id)}>
+                Duyệt với tư cách {actor}
+              </button>
+            )}
+          </div>
+        ))}
+        <button
+          type="button"
+          style={{ ...picker.reset, marginTop: 4 }}
+          onClick={() => { resetRealm(); resetDb(); onClose(); }}
+        >
+          Reset toàn bộ dữ liệu mô phỏng (realm + database)
+        </button>
+      </div>
     </div>
   );
 }
@@ -122,6 +198,7 @@ const badge = {
   pill: { background: "#1f2937", color: "#f9fafb", borderRadius: 999, padding: "4px 12px", fontSize: 11, letterSpacing: ".04em", fontFamily: "ui-monospace, monospace" },
   warn: { background: "#b45309" },
   link: { color: "#93c5fd" },
+  button: { border: 0, cursor: "pointer", font: "inherit", fontSize: 11, letterSpacing: ".04em" },
 };
 
 const picker = {
@@ -132,4 +209,6 @@ const picker = {
   row: { display: "grid", gridTemplateColumns: "1fr auto", gap: 2, textAlign: "left", padding: "10px 14px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", font: "inherit" },
   user: { fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#0f172a" },
   note: { gridColumn: "1 / -1", fontSize: 12, color: "#64748b" },
+  approve: { marginTop: 8, padding: "8px 12px", borderRadius: 8, border: 0, background: "#0f172a", color: "#fff", cursor: "pointer", font: "inherit", fontSize: 13 },
+  reset: { padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#fff", color: "#64748b", cursor: "pointer", font: "inherit", fontSize: 12 },
 };
