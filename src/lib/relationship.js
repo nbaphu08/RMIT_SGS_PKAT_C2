@@ -31,7 +31,13 @@ function tc() {
   return client;
 }
 
-const toBase64 = (b) => btoa(String.fromCharCode(...b));
+// Chia khối 32 KB: `String.fromCharCode(...b)` với PDF ~1,7 MB là RangeError (đo 2026-10-22,
+// "Maximum call stack size exceeded") vì spread đẩy hàng triệu đối số vào stack.
+const toBase64 = (b) => {
+  let s = "";
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+};
 const fromBase64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 // --- ai đang đăng nhập ------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 //
 // Quan trọng: quyền đọc từ ROLE TRONG TOKEN (realm giả lập), KHÔNG đọc từ DB. Nên Operator sửa
 // bảng `papers` trong db.js cũng không tự cấp quyền cho mình được — đúng như backend thật (T14).
-import { audit, read, update } from "./mock/db.js";
+import { audit, getBlob, listBlobs, putBlob, read, update } from "./mock/db.js";
 import { currentToken } from "./mock/tidecloak-react.jsx";
 
 export class ApiError extends Error {
@@ -100,9 +100,9 @@ export const api = {
     const token = auth();
     requireRole(token, "ps-author");
     if (ciphertext.length > 15 * 1024 * 1024) throw new ApiError(413, "payload too large");
+    await putBlob(paperId, ciphertext);
     return update((state) => {
       const paper = paperOr404(state, paperId);
-      state.blobs[paperId] = ciphertext;
       paper.blob_size = ciphertext.length;
       paper.updated_at = new Date().toISOString();
       audit(state, token.username, "PUT blob", `doc:${paperId}`, "200");
@@ -120,7 +120,7 @@ export const api = {
       update((s) => audit(s, token.username, "GET blob", `doc:${paperId}`, "403"));
       throw new ApiError(403, reason);
     }
-    const blob = state.blobs[paperId];
+    const blob = await getBlob(paperId);
     if (!blob) throw new ApiError(404, "not uploaded yet");
     update((s) => audit(s, token.username, "GET blob", `doc:${paperId}`, "200"));
     return blob;
@@ -182,10 +182,9 @@ export const api = {
     await delay();
     const token = auth();
     requireRole(token, "ps-operator");
-    const state = read();
     return {
       dir: "server/data/blobs (simulated)",
-      files: Object.entries(state.blobs).map(([id, b64]) => {
+      files: (await listBlobs()).map(([id, b64]) => {
         const head = atob(b64).slice(0, 32);
         return {
           name: `doc-${id}.bin`,
@@ -201,7 +200,7 @@ export const api = {
     await delay();
     const token = auth();
     requireRole(token, "ps-operator");
-    const blob = read().blobs[paperId];
+    const blob = await getBlob(paperId);
     if (!blob) throw new ApiError(404, "not uploaded yet");
     return blob;
   },

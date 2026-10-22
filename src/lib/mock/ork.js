@@ -10,8 +10,15 @@
 
 import { DECRYPT_ROLE, ENCRYPT_ROLE } from "./realm.js";
 
+// Chia khối 32 KB — spread cả PDF 1,7 MB vào String.fromCharCode là RangeError (xem relationship.js).
 const b64 = {
-  encode: (bytes) => btoa(String.fromCharCode(...bytes)),
+  encode: (bytes) => {
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
+  },
   decode: (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0)),
 };
 

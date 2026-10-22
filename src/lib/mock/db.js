@@ -15,7 +15,9 @@ const INITIAL = {
     p2: { id: "p2", code_title: "Federated Learning on Hospital Imaging", review_until: null, blob_size: null, updated_at: null },
     p3: { id: "p3", code_title: "Quantum-Safe Voting Protocol", review_until: days(-1), blob_size: null, updated_at: null },
   },
-  blobs: {},    // paperId -> ciphertext base64
+  // blobs KHÔNG để ở localStorage: ciphertext của một PDF 1,7 MB là ~3,1 MB base64, hai cái là
+  // vượt quota ~5 MB của origin (đo 2026-10-22) → QuotaExceededError giữa lúc demo. Dùng
+  // IndexedDB bên dưới: quota hàng trăm MB và vẫn dùng chung giữa các tab.
   policies: {}, // `${record}:${paperId}` -> [{ subject_kind, subject, policy }]
   feedback: {}, // paperId -> [{ id, ciphertext, created_at }]
   invites: [],
@@ -51,5 +53,51 @@ export function audit(state, actor, action, target, result) {
 
 export function resetDb() {
   localStorage.removeItem(KEY);
+  blobStore("readwrite").then((s) => s.clear()).catch(() => {});
   window.dispatchEvent(new Event("papersec:db"));
+}
+
+// --- Storage của ciphertext: IndexedDB (xem ghi chú ở INITIAL) ---------------------------------
+
+const DB_NAME = "papersec-blobs";
+const STORE = "blobs";
+let dbPromise = null;
+
+function openDb() {
+  dbPromise ??= new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+async function blobStore(mode) {
+  const db = await openDb();
+  return db.transaction(STORE, mode).objectStore(STORE);
+}
+
+const promisify = (req) =>
+  new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+export async function putBlob(paperId, ciphertext) {
+  const store = await blobStore("readwrite");
+  await promisify(store.put(ciphertext, paperId));
+}
+
+export async function getBlob(paperId) {
+  const store = await blobStore("readonly");
+  return (await promisify(store.get(paperId))) ?? null;
+}
+
+/** Danh sách file trên "ổ đĩa" cho Operator Console. */
+export async function listBlobs() {
+  const store = await blobStore("readonly");
+  const keys = await promisify(store.getAllKeys());
+  const values = await promisify(store.getAll());
+  return keys.map((id, i) => [id, values[i]]);
 }
