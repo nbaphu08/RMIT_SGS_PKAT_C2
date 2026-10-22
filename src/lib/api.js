@@ -45,8 +45,11 @@ export const api = {
   postFeedback: (paperId, ciphertext) => postJson(`/api/papers/${paperId}/feedback`, { ciphertext }),
   /** -> [{ id, ciphertext, created_at }] */
   feedback: async (paperId) => (await json(`/api/papers/${paperId}/feedback`)).feedback,
-  /** Ghi lời mời + change_request_id (chỉ để hiển thị; quyền thật do QEA quyết) */
+  /** Ghi lời mời (chỉ reviewer; quyền thật do QEA quyết) -> { id, paper_id, reviewer, status } */
   invite: (paperId, body) => postJson(`/api/papers/${paperId}/invites`, body),
+  /** Gắn change_request_id vào lời mời đã tạo (chỉ approver gọi được; chỉ để hiển thị) */
+  patchInvite: (inviteId, changeRequestId) =>
+    patchJson(`/api/invites/${inviteId}`, { change_request_id: changeRequestId }),
   /** -> { dir, files: [{ name, size, head_hex, is_pdf }] } */
   operatorStorage: () => json("/api/operator/storage"),
   operatorBlob: (paperId) => text(`/api/operator/blob/${paperId}`),

@@ -188,7 +188,8 @@ function AuthorRoom() {
       const role = await admin.getRole(readerRole(paper.id));
       const created = await admin.addUserRoles(user.id, [role]);
       const changeRequestId = created?.changeSetId ?? created?.draftRecordId ?? "";
-      await api.invite(paper.id, { reviewer, change_request_id: changeRequestId });
+      const invite = await api.invite(paper.id, { reviewer });
+      if (changeRequestId) await api.patchInvite(invite.id, changeRequestId);
       setStatus(`${paper.id}: change request ${changeRequestId || "(không trả id — xem tide-console)"} đang PENDING. Cần 2/3 tác giả duyệt trong tide-console → QEA Approvals.`);
     } catch (e) {
       setStatus(`${paper.id}: ${describeError(e)}`);
@@ -197,7 +198,8 @@ function AuthorRoom() {
 
   async function recordInviteManually(paper, changeRequestId) {
     try {
-      await api.invite(paper.id, { reviewer, change_request_id: changeRequestId });
+      const invite = await api.invite(paper.id, { reviewer });
+      await api.patchInvite(invite.id, changeRequestId);
       setStatus(`${paper.id}: đã ghi lời mời với change request ${changeRequestId} (role gán trong tide-console)`);
     } catch (e) {
       setStatus(`${paper.id}: ${describeError(e)}`);
