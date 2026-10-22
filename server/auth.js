@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createLocalJWKSet, jwtVerify } from 'jose';
 import { verifyDpop } from './verifyDpop.ts';
 import { audit } from './db.js';
+import { hasAuthorRole, hasReaderRole } from '../shared/authz.js';
 
 let cached = null;
 
@@ -94,5 +95,5 @@ export function requireApprover(req, res, next) {
   return req.auth.isApprover ? next() : deny(req, res, 'missing tide-realm-admin');
 }
 
-export const isAuthor = (req) => req.auth.roles.includes('ps-author');
-export const isReaderOf = (req, paperId) => req.auth.roles.includes(`ps-paper-${paperId}-reader`);
+export const isAuthor = (req) => hasAuthorRole(req.auth.roles);
+export const isReaderOf = (req, paperId) => hasReaderRole(req.auth.roles, paperId);

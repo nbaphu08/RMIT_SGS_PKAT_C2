@@ -11,6 +11,7 @@
 import { IAMService } from "@tidecloak/js";
 import { Models } from "@tideorg/js";
 import { PolicySignRequest } from "heimdall-tide";
+import { fromBase64, toBase64 } from "../../shared/base64.js";
 
 // Contract quy định sẵn. Đổi bất kỳ giá trị nào là mạng từ chối.
 export const RELATIONSHIP_CONTRACT_ID = "RelationshipAttestation:1";
@@ -30,15 +31,6 @@ function tc() {
   if (!client) throw new Error("TideCloak chưa khởi tạo: phải gọi IAMService.initIAM trước");
   return client;
 }
-
-// Chia khối 32 KB: `String.fromCharCode(...b)` với PDF ~1,7 MB là RangeError (đo 2026-10-22,
-// "Maximum call stack size exceeded") vì spread đẩy hàng triệu đối số vào stack.
-const toBase64 = (b) => {
-  let s = "";
-  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
-  return btoa(s);
-};
-const fromBase64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 // --- ai đang đăng nhập ------------------------------------------------------------------------
 

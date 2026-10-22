@@ -4,7 +4,8 @@
 // Quan trọng: quyền đọc từ ROLE TRONG TOKEN (realm giả lập), KHÔNG đọc từ DB. Nên Operator sửa
 // bảng `papers` trong db.js cũng không tự cấp quyền cho mình được — đúng như backend thật (T14).
 import { audit, getBlob, listBlobs, putBlob, read, update } from "./mock/db.js";
-import { currentToken } from "./mock/tidecloak-react.jsx";
+import { ADMIN_ROLE, denyReason, hasAuthorRole, hasReaderRole } from "../../shared/authz.js";
+import { currentToken } from "./mock/realm.js";
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -22,19 +23,12 @@ function auth() {
   return token;
 }
 
-const isAuthor = (t) => t.roles.includes("ps-author");
-const isReaderOf = (t, paperId) => t.roles.includes(`ps-paper-${paperId}-reader`);
-const isApprover = (t) => t.roles.includes("tide-realm-admin");
+const isAuthor = (t) => hasAuthorRole(t.roles);
+const isReaderOf = (t, paperId) => hasReaderRole(t.roles, paperId);
+const isApprover = (t) => t.roles.includes(ADMIN_ROLE);
 
-/** Bản sao của readDenial() trong server/routes/papers.js (plan mục 3.3, 3.4). */
-function readDenial(token, paper) {
-  if (isAuthor(token)) return null;
-  if (!isReaderOf(token, paper.id)) return `missing role ps-paper-${paper.id}-reader`;
-  if (!paper.review_until || paper.review_until <= new Date().toISOString()) {
-    return `review window for ${paper.id} has closed`;
-  }
-  return null;
-}
+/** Cùng một hàm với backend thật (shared/authz.js) — không còn hai bản sao để lệch nhau. */
+const readDenial = (token, paper) => denyReason(token.roles, paper);
 
 function requireRole(token, role) {
   if (!token.roles.includes(role)) throw new ApiError(403, `missing role ${role}`);

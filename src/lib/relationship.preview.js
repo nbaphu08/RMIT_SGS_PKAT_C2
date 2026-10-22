@@ -3,7 +3,7 @@
 //
 // Khác bản thật: chữ ký ngưỡng và mật mã là mô phỏng (ork.js nói rõ). Luật thì giống hệt.
 import { orkDecrypt, orkEncrypt, readPolicy, signPolicy } from "./mock/ork.js";
-import { currentToken } from "./mock/tidecloak-react.jsx";
+import { currentToken } from "./mock/realm.js";
 
 export const RELATIONSHIP_CONTRACT_ID = "RelationshipAttestation:1 (simulated)";
 

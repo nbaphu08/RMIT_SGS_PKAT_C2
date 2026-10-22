@@ -10,32 +10,28 @@ import {
   approveRequest,
   changeRequests,
   clearSession,
-  getSession,
+  currentToken,
   isAdmin,
+  mintToken,
   resetRealm,
-  rolesOf,
-  setSession,
+  tokenIsStale,
   subscribe,
 } from "./realm.js";
 import { resetDb } from "./db.js";
 
 const Ctx = createContext(null);
 
-/** Token giả: chụp role một lần, như JWT do Tide ký (accessTokenLifespan 600s ở realm thật). */
-const mint = (username) => ({ username, roles: rolesOf(username), issuedAt: Date.now() });
-
 export function TideCloakContextProvider({ children }) {
-  const [username, setUsername] = useState(getSession);
-  const [token, setToken] = useState(() => (getSession() ? mint(getSession()) : null));
+  // Token nằm ở sessionStorage (realm.js) để backend mô phỏng đọc cùng một bản chụp.
+  const [token, setToken] = useState(currentToken);
+  const username = token?.username ?? null;
   const [picking, setPicking] = useState(false);
   const [realmTick, setRealmTick] = useState(0);
 
   useEffect(() => subscribe(() => setRealmTick((n) => n + 1)), []);
 
   const signIn = useCallback((name) => {
-    setSession(name);
-    setUsername(name);
-    setToken(mint(name));
+    setToken(mintToken(name));
     setPicking(false);
   }, []);
 
@@ -43,10 +39,10 @@ export function TideCloakContextProvider({ children }) {
     () => ({
       username,
       token,
-      stale: token ? rolesOf(token.username).length !== token.roles.length : false,
+      stale: tokenIsStale(token),
       login: () => setPicking(true),
-      logout: () => { clearSession(); setUsername(null); setToken(null); },
-      forceRefreshToken: async () => setToken(mint(username)),
+      logout: () => { clearSession(); setToken(null); },
+      forceRefreshToken: async () => setToken(username ? mintToken(username) : null),
       signIn,
     }),
     // realmTick: role đổi ở tab khác thì tính lại `stale` để hiện nhắc Refresh token.
@@ -88,16 +84,6 @@ export function Authenticated({ children }) {
 
 export function Unauthenticated({ children }) {
   return useContext(Ctx)?.token ? null : children;
-}
-
-/** Token của phiên hiện tại — api.preview.js đọc để kiểm quyền, như backend đọc JWT. */
-export function currentToken() {
-  try {
-    const username = getSession();
-    return username ? { username, roles: rolesOf(username) } : null;
-  } catch {
-    return null;
-  }
 }
 
 // --- Giao diện riêng của bản mô phỏng ----------------------------------------------------------

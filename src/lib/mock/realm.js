@@ -134,7 +134,34 @@ export function resetRealm() {
 }
 
 // --- Phiên đăng nhập: mỗi TAB là một người, như 5 Chrome profile lúc demo thật ----------------
+//
+// Token CHỤP role tại thời điểm cấp, đúng như JWT thật: role vừa được quorum duyệt KHÔNG tự vào
+// token, phải bấm "Refresh token" (plan mục 4 bước 3). Backend mô phỏng đọc đúng bản chụp này,
+// không đọc role sống — nếu đọc role sống thì demo sẽ bỏ qua mất bước refresh.
 
-export const getSession = () => sessionStorage.getItem(SESSION_KEY) || null;
-export const setSession = (username) => sessionStorage.setItem(SESSION_KEY, username);
+export const getSession = () => {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null");
+  } catch {
+    return null;
+  }
+};
+
+/** Cấp token mới cho tab này: chụp role hiện tại của realm. */
+export function mintToken(username) {
+  const token = { username, roles: rolesOf(username), issuedAt: Date.now() };
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(token));
+  return token;
+}
+
 export const clearSession = () => sessionStorage.removeItem(SESSION_KEY);
+
+/** Token của tab hiện tại — api.preview.js đọc để kiểm quyền, như backend đọc JWT. */
+export const currentToken = () => getSession();
+
+/** Role trong realm đã khác role trong token chưa? Dùng để nhắc "bấm Refresh token". */
+export function tokenIsStale(token) {
+  if (!token) return false;
+  const live = rolesOf(token.username);
+  return live.length !== token.roles.length || live.some((r) => !token.roles.includes(r));
+}

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { BLOB_DIR, audit, db } from '../db.js';
 import { deny, isAuthor, isReaderOf, requireApprover, requireRole } from '../auth.js';
+import { denyReason } from '../../shared/authz.js';
 
 export const blobPath = (paperId) => join(BLOB_DIR, `doc-${paperId}.bin`);
 
@@ -15,14 +16,7 @@ const findPaper = (id) => db.prepare(`select * from papers where id = ?`).get(id
  * khớp ĐÚNG :id (chặn IDOR) và còn trong hạn phản biện (mục 3.3, 3.4).
  * Lớp hạn này chỉ để trải nghiệm tốt — hạn thật do policy đã ký ở ORK thực thi (T16).
  */
-export function readDenial(req, paper) {
-  if (isAuthor(req)) return null;
-  if (!isReaderOf(req, paper.id)) return `missing role ps-paper-${paper.id}-reader`;
-  if (!paper.review_until || paper.review_until <= new Date().toISOString()) {
-    return `review window for ${paper.id} has closed`;
-  }
-  return null;
-}
+export const readDenial = (req, paper) => denyReason(req.auth.roles, paper);
 
 // Tác giả thấy cả 3 paper; người khác chỉ thấy paper mà JWT có role reader tương ứng
 // (kể cả khi đã hết hạn, để UI hiện được "hết hạn" — mở blob vẫn 403).

@@ -53,7 +53,8 @@ export function audit(state, actor, action, target, result) {
 
 export function resetDb() {
   localStorage.removeItem(KEY);
-  blobStore("readwrite").then((s) => s.clear()).catch(() => {});
+  memory.clear();
+  if (!noIdb()) blobStore("readwrite").then((s) => s.clear()).catch(() => {});
   window.dispatchEvent(new Event("papersec:db"));
 }
 
@@ -62,6 +63,11 @@ export function resetDb() {
 const DB_NAME = "papersec-blobs";
 const STORE = "blobs";
 let dbPromise = null;
+
+// Dự phòng khi không có IndexedDB: chế độ ẩn danh chặn storage, và test chạy ngoài trình duyệt.
+// Mất khi reload và không chia sẻ giữa các tab, nhưng app vẫn chạy thay vì ném lỗi.
+const memory = new Map();
+const noIdb = () => typeof indexedDB === "undefined";
 
 function openDb() {
   dbPromise ??= new Promise((resolve, reject) => {
@@ -85,17 +91,20 @@ const promisify = (req) =>
   });
 
 export async function putBlob(paperId, ciphertext) {
+  if (noIdb()) return void memory.set(paperId, ciphertext);
   const store = await blobStore("readwrite");
   await promisify(store.put(ciphertext, paperId));
 }
 
 export async function getBlob(paperId) {
+  if (noIdb()) return memory.get(paperId) ?? null;
   const store = await blobStore("readonly");
   return (await promisify(store.get(paperId))) ?? null;
 }
 
 /** Danh sách file trên "ổ đĩa" cho Operator Console. */
 export async function listBlobs() {
+  if (noIdb()) return [...memory.entries()];
   const store = await blobStore("readonly");
   const keys = await promisify(store.getAllKeys());
   const values = await promisify(store.getAll());

@@ -1,7 +1,6 @@
 // tidecloak-js.js — thay @tidecloak/js khi chạy Plan C. AdminAPI tạo change request THẬT trong
 // realm giả lập: gán role chỉ có hiệu lực sau khi 2/3 tác giả duyệt (plan mục 4 bước 1–2).
-import { IDENTITIES, createRoleRequest } from "./realm.js";
-import { currentToken } from "./tidecloak-react.jsx";
+import { IDENTITIES, createRoleRequest, currentToken } from "./realm.js";
 
 export const IAMService = {
   getConfig: () => ({ realm: "unreleased (simulated)" }),
