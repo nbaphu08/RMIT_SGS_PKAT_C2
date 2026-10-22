@@ -123,3 +123,30 @@ tính trên **tài khoản Tide được liên kết**, và hiện chỉ có 1/5
 
 **Trạng thái:** đã nhờ BTC/đội Tide nâng giới hạn lên ≥ 5. **Không chạy `finalize.sh`** khi chưa đủ 5 người liên kết
 (mục 8, G1): ngưỡng sẽ sai và không đảo ngược được. T1–T16 vẫn TRỐNG.
+
+### 2026-10-22 — Mạng ORK quá tải; BTC công bố Plan C
+
+Thử liên kết tiếp sau khi licence được nâng lên 10 user. Lỗi **từ mạng ORK công khai của Tide**,
+không phải từ realm local:
+
+| Lần | Thông báo thật trên `ork1.tideprotocol.com` |
+|---|---|
+| 1 | `Could not reach enough NEW ORKs (got 2 of 20 required, 18 of 20 failed)` |
+| 2 | `Request to /Network/Authentication/Users/GetReservers/... returned HTTP 503` |
+| 3 | `Could not reach enough NEW ORKs (got 18 of 20 required, 1 of 20 failed)` — đỡ dần nhưng vẫn chưa đủ |
+
+Một lỗi phụ đã hiểu rõ: **link liên kết chỉ dùng được MỘT lần**. Bấm lại link cũ sau khi lỗi giữa
+chừng thì TideCloak báo `TokenSignatureInvalidException: Invalid token signature` (log local,
+token_id khớp link đã dùng). Mỗi lần hỏng phải sinh link mới bằng `scripts/tide/invite.sh`.
+
+**BTC công bố Plan C** (https://tide.org/unlocked/#plan-c, Discord 15:40): xây prototype như thể
+TideCloak bảo vệ và **mô phỏng** các lớp bảo vệ; *"Simulated and live integrations are judged
+exactly the same."*
+
+**Đã làm theo:** `npm run preview:ui` chạy bản mô phỏng ba lớp — `realm.js` (quorum 2/3),
+`ork.js` (policy + expiry + role), `db.js` (thứ Operator sửa được). 7 test ở `npm run test:sim`
+chứng minh các luật được thực thi: sai paper, hết hạn, thiếu `_tide_decryptor`, policy bị sửa.
+Mã nguồn thật không bị sửa dòng nào — `vite.config.js` chỉ đổi hướng 4 import ở mode `preview-ui`.
+
+**Trạng thái:** owner 1/5 đã liên kết thật. T1–T16 trên Tide thật vẫn TRỐNG; chưa chạy
+`finalize.sh`. Vẫn thử liên kết thật song song khi mạng Tide ổn định.

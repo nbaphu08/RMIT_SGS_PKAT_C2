@@ -58,19 +58,19 @@ export function ProfileOnboarding({ baseUrl, realm, required = false, onDone }) 
       });
 
       if (res.status === 401 || res.status === 403) {
-        throw new Error("Không có quyền cập nhật profile. Kiểm tra token có audience `account`.");
+        throw new Error("You are not authorized to update this profile. Verify that the token carries the `account` audience.");
       }
       if (res.status === 202) {
         // Account API không nên trả 202. Nếu có thì IGA đã bắt lấy và đang chờ duyệt —
         // nói thật chứ không báo thành công khống.
-        throw new Error("Thay đổi đang chờ admin duyệt, chưa được lưu.");
+        throw new Error("The change is awaiting administrator approval and has not been saved.");
       }
-      if (!res.ok) throw new Error(`Không lưu được (${res.status}).`);
+      if (!res.ok) throw new Error(`The change could not be saved (${res.status}).`);
 
       setOpen(false);
       onDone?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Có lỗi xảy ra.");
+      setError(e instanceof Error ? e.message : "An error occurred.");
     } finally {
       setBusy(false);
     }
@@ -89,15 +89,15 @@ export function ProfileOnboarding({ baseUrl, realm, required = false, onDone }) 
       <div style={{ background: "var(--card-bg, #fff)", color: "var(--card-fg, #111)",
                     borderRadius: 12, padding: "1.5rem", width: "min(28rem, 100%)" }}>
         <h2 id="tide-onboarding-title" style={{ margin: "0 0 .25rem", fontSize: "1.15rem" }}>
-          Chào mừng tới Unreleased Studio
+          Welcome to Unreleased Studio
         </h2>
         <p style={{ margin: "0 0 1rem", opacity: .75, fontSize: ".9rem" }}>
-          {required ? "Cần vài thông tin trước khi tiếp tục." : "Không bắt buộc — đặt sau cũng được."}
+          {required ? "A few details are required before you may continue." : "This is optional — you may provide it later."}
         </p>
 
         <label style={{ display: "block", marginBottom: ".75rem" }}>
           <span style={{ display: "block", fontSize: ".85rem", marginBottom: ".25rem" }}>
-            Gọi bạn là gì?
+            How should we address you?
           </span>
           <input
             type="text"
@@ -121,13 +121,13 @@ export function ProfileOnboarding({ baseUrl, realm, required = false, onDone }) 
             <button type="button" onClick={dismiss} disabled={busy}
                     style={{ padding: ".5rem .9rem", borderRadius: 6, border: "1px solid var(--border,#ccc)",
                              background: "transparent", color: "inherit", cursor: "pointer" }}>
-              Để sau
+              Later
             </button>
           )}
           <button type="button" onClick={save} disabled={busy}
                   style={{ padding: ".5rem .9rem", borderRadius: 6, border: "none",
                            background: "var(--accent, #1f6feb)", color: "#fff", cursor: "pointer" }}>
-            {busy ? "Đang lưu…" : "Lưu"}
+            {busy ? "Saving…" : "Save"}
           </button>
         </div>
       </div>

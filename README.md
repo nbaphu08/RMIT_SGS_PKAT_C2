@@ -54,7 +54,49 @@ Không có Tide, khóa giải mã sẽ nằm trên server, và người giữ se
 
 <!-- What does your prototype demonstrate today? Describe the key interaction judges should look for. -->
 
-## Setup
+---
+
+## Chạy bản mô phỏng (Plan C) — không cần mạng Tide
+
+Mạng ORK của Tide đang quá tải nên bước liên kết tài khoản chưa hoàn tất được (chi tiết và số đo
+trong [`docs/VERIFICATION_LOG.md`](docs/VERIFICATION_LOG.md)). Theo thông báo chính thức của ban tổ
+chức — [tide.org/unlocked/#plan-c](https://tide.org/unlocked/#plan-c), *"build your prototype as
+though TideCloak protects it and simulate those protections for now… judged exactly the same as a
+live integration"* — repo này có sẵn một bản mô phỏng chạy được ngay:
+
+```bash
+npm install
+npm run preview:ui     # http://localhost:5138
+```
+
+Mỗi **tab** là một người (thay cho 5 Chrome profile ở bản thật). Mở 3 tab, chọn `owner`,
+`approver2`, `reviewer` để chạy trọn luồng 2/3 duyệt trong [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
+
+### Cái gì được mô phỏng, cái gì là thật
+
+| Lớp | File | Trong bản mô phỏng | Ở bản thật |
+|---|---|---|---|
+| Governance | `src/lib/mock/realm.js` | Change request cần **2/3** tác giả duyệt; Operator duyệt bị `403` | TideCloak + QEA Approvals |
+| Mật mã | `src/lib/mock/ork.js` | Policy đã "ký" mang `subject` + `recordId` + `expiry`; mọi lần giải mã đều kiểm lại | Mạng ORK, chữ ký ngưỡng |
+| Dữ liệu server | `src/lib/mock/db.js` | Operator sửa được thoải mái — và vẫn không mở được paper | SQLite + ổ đĩa |
+| Đăng nhập | `src/lib/mock/tidecloak-react.jsx` | Token **chụp role lúc cấp**: role mới phải bấm Refresh token | JWT do Tide ký, DPoP |
+
+**Thành thật về giới hạn:** chữ ký ngưỡng và mã hóa trong `ork.js` là mô phỏng — chúng chứng minh
+*luật* (đúng paper, đúng hạn, đúng role, policy sửa là hỏng), **không** chứng minh mật mã. Toàn bộ
+mã nguồn thật (`src/App.jsx`, `src/lib/api.js`, `src/lib/relationship.js`, `server/**`) **không bị
+sửa một dòng nào** cho bản mô phỏng: `vite.config.js` chỉ đổi hướng 4 import khi chạy
+`--mode preview-ui`. Khi mạng Tide ổn định, `npm run dev` chạy tích hợp thật mà không cần đổi code.
+
+### Kiểm thử
+
+```bash
+npm test         # 27 test backend thật (JWT/DPoP tự sinh)
+npm run test:sim #  7 test luật của mạng ORK mô phỏng (sai paper, hết hạn, policy bị sửa…)
+```
+
+---
+
+## Setup (tích hợp Tide thật)
 
 Yêu cầu: Docker Desktop, Node.js ≥ 22.5 (dùng `node:sqlite`), `jq`, `curl`. Chạy trên macOS/Linux.
 

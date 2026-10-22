@@ -2,7 +2,17 @@
 
 Theo plan mục 4. Mỗi vai một Chrome profile, đã đăng nhập sẵn trước khi bắt đầu.
 
-## Chuẩn bị (trước demo, không quay)
+## Hai cách chạy demo
+
+**A. Bản mô phỏng (Plan C — dùng được ngay):** `npm run preview:ui` → http://localhost:5138.
+Mỗi **tab** là một người, thay cho 5 Chrome profile. Mở 4 tab: owner, approver2, reviewer, operator.
+Bỏ qua phần "Chuẩn bị" bên dưới — realm, policy và dữ liệu đã seed sẵn; chỉ cần vào tab Ký policy
+(owner) bấm ký 9 policy, rồi tải `samples/p1.pdf` lên. Các cảnh 1–6 chạy y nguyên.
+
+**B. Tích hợp Tide thật:** cần `finalize.sh` đã chạy và 5 người đã liên kết tài khoản Tide.
+Làm theo phần "Chuẩn bị" bên dưới.
+
+## Chuẩn bị (bản thật — trước demo, không quay)
 
 - [ ] `finalize.sh` đã chạy, T2 (ngưỡng = 2) đã đo.
 - [ ] Tab **Ký policy** (owner): đã ký đủ 9 policy, có cột trạng thái "đã ký và lưu".

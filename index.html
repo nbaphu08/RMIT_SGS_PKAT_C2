@@ -3,11 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#102a29" />
-    <title>Papersec</title>
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="color-scheme" content="dark" />
+
+    <title>Papersec — deliver unpublished manuscripts to a single designated reviewer</title>
+    <meta
+      name="description"
+      content="Papersec encrypts a manuscript within the browser and grants read access solely to the reviewer approved by 2 of 3 authors, for a defined period. Once that period elapses, the ORK network declines to decrypt the document, even if the server operator amends the database."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Papersec" />
+    <meta
+      property="og:description"
+      content="Share unpublished manuscripts under read access enforced by the network rather than by the server."
+    />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap"
+    />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Papersec",
+        "applicationCategory": "SecurityApplication",
+        "operatingSystem": "Web",
+        "description": "Deliver an unpublished research manuscript to a single designated reviewer, for a defined period only. The manuscript is encrypted within the browser; read access is bound to a per-manuscript role and lapses at the deadline recorded in a policy signed by threshold cryptography."
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      Papersec requires JavaScript in order to encrypt and decrypt manuscripts within the browser.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

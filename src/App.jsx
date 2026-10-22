@@ -26,12 +26,76 @@ function deadlineMs(reviewUntil) {
 
 function describeDeadline(reviewUntil) {
   const ms = deadlineMs(reviewUntil);
-  if (ms === null) return "không hạn";
+  if (ms === null) return "No deadline";
   const left = ms - Date.now();
-  if (left <= 0) return `HẾT HẠN ${new Date(ms).toLocaleString()}`;
+  if (left <= 0) return `EXPIRED ${new Date(ms).toLocaleString("en-GB")}`;
   const hours = Math.floor(left / 3_600_000);
-  return hours >= 24 ? `còn ${Math.floor(hours / 24)} ngày` : `còn ${hours} giờ`;
+  return hours >= 24 ? `${Math.floor(hours / 24)} days remaining` : `${hours} hours remaining`;
 }
+
+// --- Nguyên liệu dùng chung --------------------------------------------------------------------
+
+const ICONS = {
+  authors: [
+    "M16 19v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 17.5V19",
+    "M17 11.5a3 3 0 0 0 0-6",
+    "M20.5 19v-1.5a3.5 3.5 0 0 0-2.6-3.37",
+  ],
+  reviewer: ["M3 13h4.5l1.8 2.5h5.4L16.5 13H21", "M6 5h12l3 8v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-5z"],
+  operator: ["M7 9.5l3 2.5-3 2.5", "M13 15h4"],
+  policies: ["M12 3l7.5 3v5.6c0 4.2-3.1 7.9-7.5 9.4-4.4-1.5-7.5-5.2-7.5-9.4V6z", "M9 12.2l2.3 2.3 4-4.3"],
+  refresh: ["M20.5 12a8.5 8.5 0 1 1-2.6-6.1", "M19.5 2.5V7H15"],
+  logout: ["M9.5 21h-4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "M16.5 16.5L21 12l-4.5-4.5", "M21 12H9.5"],
+  file: ["M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z", "M13.5 3v5.5H19"],
+  lock: ["M7 10.5V7.5a5 5 0 0 1 10 0v3", "M5.5 10.5h13v9h-13z"],
+};
+
+/** Icon trang trí: luôn aria-hidden, nghĩa nằm ở nhãn chữ đi kèm. */
+function Icon({ name, size = 18 }) {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {name === "authors" && <circle cx="10" cy="7.5" r="3.5" />}
+      {name === "operator" && <rect x="3" y="4" width="18" height="16" rx="2.5" />}
+      {ICONS[name].map((d) => <path key={d} d={d} />)}
+    </svg>
+  );
+}
+
+/**
+ * Mọi kết quả do máy sinh ra. `deny` cố ý không dùng màu lỗi: trong Papersec, việc mạng ORK từ
+ * chối giải mã là kết quả đúng của bài demo chứ không phải hỏng hóc.
+ */
+function Proof({ state, id }) {
+  return (
+    <output
+      id={id}
+      className={`proof${state ? ` proof--${state.tone}` : ""}`}
+      aria-live="polite"
+    >
+      {state?.text ?? ""}
+    </output>
+  );
+}
+
+function Deadline({ reviewUntil }) {
+  const ms = deadlineMs(reviewUntil);
+  const text = describeDeadline(reviewUntil);
+  if (ms === null) return <span>{text}</span>;
+  return <time dateTime={new Date(ms).toISOString()}>{text}</time>;
+}
+
+// --- Vỏ ứng dụng -------------------------------------------------------------------------------
 
 export default function App() {
   const { isInitializing, initError } = useTideCloak();
@@ -42,11 +106,11 @@ export default function App() {
   });
 
   if (isCallback) {
-    if (callbackError) return <p className="loading">Đăng nhập thất bại: {callbackError.message}</p>;
-    return <p className="loading">{isProcessing ? "Đang hoàn tất đăng nhập…" : "Đang chuyển hướng…"}</p>;
+    if (callbackError) return <Gate>Sign-in failed: {callbackError.message}</Gate>;
+    return <Gate>{isProcessing ? "Completing sign-in…" : "Redirecting…"}</Gate>;
   }
-  if (isInitializing) return <p className="loading">Đang khởi tạo TideCloak…</p>;
-  if (initError) return <p className="loading">Không khởi tạo được TideCloak: {initError.message}</p>;
+  if (isInitializing) return <Gate>Initializing TideCloak…</Gate>;
+  if (initError) return <Gate>TideCloak could not be initialized: {initError.message}</Gate>;
 
   return (
     <>
@@ -60,18 +124,38 @@ export default function App() {
   );
 }
 
+function Gate({ children }) {
+  return (
+    <main className="gate">
+      <p className="gate__status" role="status">{children}</p>
+    </main>
+  );
+}
+
 function Login() {
   const { login } = useTideCloak();
   return (
-    <div className="loading">
-      <div style={{ textAlign: "center" }}>
-        <h1 style={{ fontSize: 34 }}>Papersec</h1>
-        <p>Gửi bản thảo chưa công bố cho đúng một người phản biện, trong đúng thời hạn.</p>
-        <button className="button dark" onClick={login}>Đăng nhập bằng Tide</button>
-      </div>
-    </div>
+    <main className="gate">
+      <article>
+        <h1 className="gate__title">Papersec</h1>
+        <p className="gate__lede">
+          Deliver an unpublished manuscript to a single designated reviewer, for a defined
+          period only.
+        </p>
+        <button type="button" className="btn btn--primary" onClick={login}>
+          Sign in with Tide
+        </button>
+      </article>
+    </main>
   );
 }
+
+const TAB_LABELS = {
+  authors: "Author Workspace",
+  reviewer: "Reviewer Inbox",
+  operator: "Operator Console",
+  policies: "Policy Signing",
+};
 
 function Shell() {
   const { logout, forceRefreshToken, getValueFromToken } = useTideCloak();
@@ -85,10 +169,10 @@ function Shell() {
   useEffect(load, [load]);
 
   async function refresh() {
-    setStatus("đang làm mới token…");
+    setStatus("Refreshing token…");
     await forceRefreshToken();
     load();
-    setStatus("đã làm mới token");
+    setStatus("Token refreshed");
   }
 
   // Tab hiện theo role trong token (plan mục 5.3). Tác giả cũng là tide-realm-admin (mục 2).
@@ -97,45 +181,97 @@ function Shell() {
   const isOperator = roles.includes(OPERATOR_ROLE);
   const hasReader = PAPER_IDS.some((id) => roles.includes(readerRole(id)));
   const tabs = [
-    ...(isAuthor ? [["authors", "Phòng tác giả"]] : []),
-    ...(hasReader || (!isAuthor && !isOperator) ? [["reviewer", "Hộp thư phản biện"]] : []),
-    ...(isOperator ? [["operator", "Operator Console"]] : []),
-    ...(isAuthor || roles.includes(ADMIN_ROLE) ? [["policies", "Ký policy"]] : []),
+    ...(isAuthor ? ["authors"] : []),
+    ...(hasReader || (!isAuthor && !isOperator) ? ["reviewer"] : []),
+    ...(isOperator ? ["operator"] : []),
+    ...(isAuthor || roles.includes(ADMIN_ROLE) ? ["policies"] : []),
   ];
-  const active = tabs.some(([id]) => id === tab) ? tab : tabs[0]?.[0];
+  const active = tabs.includes(tab) ? tab : tabs[0];
+  const username = me?.username ?? getValueFromToken("preferred_username") ?? "…";
 
   return (
-    <div className="shell">
-      <header className="topbar">
-        <div className="brand">
-          <span className="brand-mark">P</span> Papersec
-        </div>
-        <div className="top-actions">
-          <span className="auth-state connected">
-            <i />
-            {me?.username ?? getValueFromToken("preferred_username") ?? "…"}
-            {roles.length > 0 && ` · ${roles.join(", ")}`}
-            {status && ` · ${status}`}
-          </span>
-          <button className="button outline" onClick={refresh}>Refresh token</button>
-          <button className="button quiet" onClick={logout}>Đăng xuất</button>
-        </div>
-      </header>
-      <nav className="toolbar">
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            className={`button ${active === id ? "dark" : "quiet"}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
+    <div className="app">
+      <nav className="rail" aria-label="Workspace shortcuts">
+        <ul className="rail__list">
+          {tabs.map((id) => (
+            <li key={id}>
+              <button
+                type="button"
+                className="rail__btn"
+                aria-selected={active === id}
+                aria-label={TAB_LABELS[id]}
+                onClick={() => setTab(id)}
+              >
+                <Icon name={id} />
+              </button>
+            </li>
+          ))}
+        </ul>
+        <ul className="rail__list rail__list--end">
+          <li>
+            <button type="button" className="rail__btn" aria-label="Refresh token" onClick={refresh}>
+              <Icon name="refresh" />
+            </button>
+          </li>
+          <li>
+            <button type="button" className="rail__btn" aria-label="Sign out" onClick={logout}>
+              <Icon name="logout" />
+            </button>
+          </li>
+        </ul>
       </nav>
-      {active === "authors" && <AuthorRoom />}
-      {active === "reviewer" && <ReviewerInbox />}
-      {active === "operator" && <OperatorConsole />}
-      {active === "policies" && <PolicySigner />}
+
+      <main className="main">
+        <div className="main__inner">
+          <p className="session">
+            <span className="session__dot" aria-hidden="true" />
+            <span className="sr-only">Active Tide session — </span>
+            {username}
+            {roles.length > 0 && <span className="session__roles">· {roles.join(", ")}</span>}
+          </p>
+
+          <header className="hero">
+            <p className="eyebrow">
+              <span aria-hidden="true">—</span>
+              {new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" })}
+              {" · "}
+              {status || `${tabs.length} workspaces available`}
+            </p>
+            <h1 className="hero__title">
+              Welcome, {username}.
+              <span>Where would you like to begin?</span>
+            </h1>
+
+            <div className="tabs" role="tablist" aria-label="Workspaces">
+              {tabs.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`tab-${id}`}
+                  className="tab"
+                  aria-selected={active === id}
+                  aria-controls={`panel-${id}`}
+                  onClick={() => setTab(id)}
+                >
+                  <Icon name={id} size={16} />
+                  {TAB_LABELS[id]}
+                </button>
+              ))}
+            </div>
+          </header>
+
+          {active && (
+            <section id={`panel-${active}`} role="tabpanel" aria-labelledby={`tab-${active}`} tabIndex={-1}>
+              <h2 className="sr-only">{TAB_LABELS[active]}</h2>
+              {active === "authors" && <AuthorRoom />}
+              {active === "reviewer" && <ReviewerInbox />}
+              {active === "operator" && <OperatorConsole />}
+              {active === "policies" && <PolicySigner />}
+            </section>
+          )}
+        </div>
+      </main>
     </div>
   );
 }
@@ -155,21 +291,21 @@ function usePapers() {
 
 function AuthorRoom() {
   const { papers, error, reload } = usePapers();
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(null);
   const [reviewer, setReviewer] = useState("reviewer");
   const [notes, setNotes] = useState({});
 
   async function encryptAndUpload(paper, file) {
-    setStatus(`${paper.id}: đọc ${file.name} rồi mã hóa trong trình duyệt…`);
+    setStatus({ tone: "pending", text: `${paper.id}: reading ${file.name} and encrypting it within the browser…` });
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
       const policy = await policyFor(paper.id, "doc");
       const ciphertext = await encryptForRecord(bytes, `doc:${paper.id}`, policy);
       const saved = await api.putBlob(paper.id, ciphertext);
-      setStatus(`${paper.id}: đã tải lên ${saved.blob_size} byte ciphertext (plaintext ${bytes.length} byte không rời trình duyệt)`);
+      setStatus({ tone: "ok", text: `${paper.id}: uploaded ${saved.blob_size} bytes of ciphertext (${bytes.length} bytes of plaintext never left the browser)` });
       reload();
     } catch (e) {
-      setStatus(`${paper.id}: ${describeError(e)}`);
+      setStatus({ tone: "deny", text: `${paper.id}: ${describeError(e)}` });
     }
   }
 
@@ -179,20 +315,20 @@ function AuthorRoom() {
    * bên dưới. Quyền chỉ có hiệu lực sau khi 2/3 tác giả duyệt.
    */
   async function invite(paper) {
-    setStatus(`${paper.id}: gọi admin API để tạo change request gán ${readerRole(paper.id)} cho "${reviewer}"…`);
+    setStatus({ tone: "pending", text: `${paper.id}: calling the admin API to create a change request granting ${readerRole(paper.id)} to "${reviewer}"…` });
     try {
       const admin = new AdminAPI(IAMService.getConfig()?.realm);
       const users = await admin.getUsers({ search: reviewer });
       const user = (users ?? []).find((u) => u.username === reviewer);
-      if (!user) throw new Error(`không tìm thấy user "${reviewer}" trong realm`);
+      if (!user) throw new Error(`the user "${reviewer}" was not found in the realm`);
       const role = await admin.getRole(readerRole(paper.id));
       const created = await admin.addUserRoles(user.id, [role]);
       const changeRequestId = created?.changeSetId ?? created?.draftRecordId ?? "";
       const invite = await api.invite(paper.id, { reviewer });
       if (changeRequestId) await api.patchInvite(invite.id, changeRequestId);
-      setStatus(`${paper.id}: change request ${changeRequestId || "(không trả id — xem tide-console)"} đang PENDING. Cần 2/3 tác giả duyệt trong tide-console → QEA Approvals.`);
+      setStatus({ tone: "pending", text: `${paper.id}: change request ${changeRequestId || "(no id returned — consult tide-console)"} is PENDING. Approval by 2 of 3 authors is required in tide-console → QEA Approvals.` });
     } catch (e) {
-      setStatus(`${paper.id}: ${describeError(e)}`);
+      setStatus({ tone: "deny", text: `${paper.id}: ${describeError(e)}` });
     }
   }
 
@@ -200,14 +336,14 @@ function AuthorRoom() {
     try {
       const invite = await api.invite(paper.id, { reviewer });
       await api.patchInvite(invite.id, changeRequestId);
-      setStatus(`${paper.id}: đã ghi lời mời với change request ${changeRequestId} (role gán trong tide-console)`);
+      setStatus({ tone: "ok", text: `${paper.id}: invitation recorded against change request ${changeRequestId} (role granted in tide-console)` });
     } catch (e) {
-      setStatus(`${paper.id}: ${describeError(e)}`);
+      setStatus({ tone: "deny", text: `${paper.id}: ${describeError(e)}` });
     }
   }
 
   async function readFeedback(paper) {
-    setStatus(`${paper.id}: đang giải mã nhận xét…`);
+    setStatus({ tone: "pending", text: `${paper.id}: decrypting feedback…` });
     try {
       const policy = await policyFor(paper.id, "fb");
       const rows = await api.feedback(paper.id);
@@ -215,79 +351,122 @@ function AuthorRoom() {
         rows.map((row) => decryptForRecord(row.ciphertext, `fb:${paper.id}`, policy)),
       );
       setNotes((prev) => ({ ...prev, [paper.id]: texts }));
-      setStatus(`${paper.id}: đã giải mã ${texts.length} nhận xét`);
+      setStatus({ tone: "ok", text: `${paper.id}: decrypted ${texts.length} feedback entries` });
     } catch (e) {
-      setStatus(`${paper.id}: ${describeError(e)}`);
+      setStatus({ tone: "deny", text: `${paper.id}: ${describeError(e)}` });
     }
   }
 
   return (
-    <section className="section">
-      <div className="section-heading">
-        <h2>Phòng tác giả — bản thảo của nhóm</h2>
-        <span className="count-pill">{papers.length} paper</span>
+    <>
+      <div className="console">
+        <label className="console__label" htmlFor="author-reviewer">
+          Reviewer to invite
+        </label>
+        <input
+          id="author-reviewer"
+          className="field"
+          value={reviewer}
+          onChange={(e) => setReviewer(e.target.value)}
+          autoComplete="off"
+          aria-describedby="author-reviewer-hint"
+        />
+        <p className="console__hint" id="author-reviewer-hint">
+          A username within the realm. Each invitation creates a change request that takes effect
+          only once 2 of 3 authors have approved it.
+        </p>
+        <Proof state={status} />
       </div>
-      {error && <p className="empty">{error}</p>}
-      {status && <p className="notice">{status}</p>}
-      <label className="capacity-label">
-        Người phản biện được mời
-        <input value={reviewer} onChange={(e) => setReviewer(e.target.value)} style={{ width: 160 }} />
-      </label>
-      <div className="course-grid">
-        {papers.map((paper) => (
-          <article className="course-card" key={paper.id}>
-            <div className="course-top">
-              <span className="course-code">{paper.id}</span>
-              <span className={`seats ${paper.blob_size ? "open" : "full"}`}>
-                {paper.blob_size ? `đã mã hóa · ${paper.blob_size} B` : "chưa mã hóa"}
-              </span>
-            </div>
-            <h3>{paper.code_title ?? paper.id}</h3>
-            <p className="course-stats">Hạn phản biện: <b>{describeDeadline(paper.review_until)}</b></p>
-            <label className="capacity-label">
-              Mã hóa &amp; tải lên PDF
-              <input
-                type="file"
-                accept="application/pdf"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) encryptAndUpload(paper, file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            <button className="button outline full-width" onClick={() => invite(paper)}>
-              Mời phản biện
-            </button>
-            <button className="button quiet full-width" onClick={() => readFeedback(paper)}>
-              Đọc nhận xét
-            </button>
-            <ManualInvite onSubmit={(id) => recordInviteManually(paper, id)} />
-            {(notes[paper.id] ?? []).map((note, i) => (
-              <p className="request-reason" key={i}>“{note}”</p>
-            ))}
-          </article>
-        ))}
-      </div>
-    </section>
+
+      <section className="section" aria-labelledby="authors-papers">
+        <div className="section__head">
+          <h3 className="section__title" id="authors-papers">Manuscripts held by the team</h3>
+          <p className="section__meta">{papers.length} manuscripts</p>
+        </div>
+
+        {error && <p className="empty" role="alert">{error}</p>}
+
+        <ul className="paper-grid">
+          {papers.map((paper) => (
+            <li key={paper.id}>
+              <article className="paper-card">
+                <div className="paper-card__top">
+                  <p className="paper-card__id">{paper.id}</p>
+                  <p className={`crypto-tag crypto-tag--${paper.blob_size ? "sealed" : "plain"}`}>
+                    <Icon name="lock" size={12} />
+                    {paper.blob_size ? `Encrypted · ${paper.blob_size} B` : "Not encrypted"}
+                  </p>
+                </div>
+
+                <h4 className="paper-card__title">{paper.code_title ?? paper.id}</h4>
+                <p className="paper-card__deadline">
+                  Review deadline: <Deadline reviewUntil={paper.review_until} />
+                </p>
+
+                <div className="paper-card__actions">
+                  <label className="file-field">
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) encryptAndUpload(paper, file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <span className="btn file-field__btn">Encrypt &amp; upload PDF</span>
+                  </label>
+                  <button type="button" className="btn btn--block" onClick={() => invite(paper)}>
+                    Invite a reviewer
+                  </button>
+                  <button type="button" className="btn btn--ghost btn--block" onClick={() => readFeedback(paper)}>
+                    Read feedback
+                  </button>
+                  <ManualInvite paperId={paper.id} onSubmit={(id) => recordInviteManually(paper, id)} />
+                </div>
+
+                {(notes[paper.id] ?? []).length > 0 && (
+                  <ul className="notes">
+                    {notes[paper.id].map((note, i) => (
+                      <li key={i}>“{note}”</li>
+                    ))}
+                  </ul>
+                )}
+              </article>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }
 
 /** Phương án lùi khi admin API bị CORS chặn (plan mục 8, G3): gán role trong tide-console rồi dán id. */
-function ManualInvite({ onSubmit }) {
+function ManualInvite({ paperId, onSubmit }) {
   const [value, setValue] = useState("");
+  const inputId = `manual-invite-${paperId}`;
   return (
-    <div className="request-actions">
+    <form
+      className="console__row"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit(value.trim());
+      }}
+    >
+      <label className="sr-only" htmlFor={inputId}>
+        change_request_id for {paperId}, obtained from tide-console
+      </label>
       <input
-        placeholder="change_request_id từ tide-console"
+        id={inputId}
+        className="field"
+        placeholder="change_request_id from tide-console"
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        style={{ width: "100%" }}
       />
-      <button className="button quiet" onClick={() => onSubmit(value.trim())} disabled={!value.trim()}>
-        Ghi
+      <button type="submit" className="btn btn--ghost" disabled={!value.trim()}>
+        Record
       </button>
-    </div>
+    </form>
   );
 }
 
@@ -295,109 +474,153 @@ function ManualInvite({ onSubmit }) {
 
 function ReviewerInbox() {
   const { papers, error } = usePapers();
-  const [probe, setProbe] = useState("");
+  const [probe, setProbe] = useState(null);
 
   async function probePaper(paperId) {
-    setProbe(`đang gọi GET /api/papers/${paperId}/blob …`);
+    setProbe({ tone: "pending", text: `calling GET /api/papers/${paperId}/blob …` });
     try {
       await api.getBlob(paperId);
-      setProbe(`${paperId}: 200 — backend đã trả ciphertext. Với paper không được cấp hoặc đã hết hạn thì đây là lỗi: ghi vào VERIFICATION_LOG.`);
+      setProbe({ tone: "ok", text: `${paperId}: 200 — the backend returned ciphertext. For a manuscript that was never granted, or one that has expired, this constitutes a failure: record it in VERIFICATION_LOG.` });
     } catch (e) {
-      setProbe(`${paperId}: ${describeError(e)}`);
+      setProbe({ tone: "deny", text: `${paperId}: ${describeError(e)}` });
     }
   }
 
   return (
-    <section className="section">
-      <div className="section-heading">
-        <h2>Hộp thư phản biện — paper được cấp quyền</h2>
-        <span className="count-pill">{papers.length} paper</span>
-      </div>
-      {error && <p className="empty">{error}</p>}
-      {papers.length === 0 && (
-        <p className="empty">
-          Chưa có paper nào. Role `ps-paper-&lt;id&gt;-reader` chỉ vào token sau khi 2/3 tác giả duyệt
-          change request và bạn bấm Refresh token.
-        </p>
-      )}
-      {papers.map((paper) => <ReviewerPaper key={paper.id} paper={paper} />)}
-      <div className="blocked-card">
-        <div>
-          <span className="blocked-icon">⛔</span>
+    <>
+      <section className="section" aria-labelledby="reviewer-papers">
+        <div className="section__head">
+          <h3 className="section__title" id="reviewer-papers">Manuscripts granted to you</h3>
+          <p className="section__meta">{papers.length} manuscripts</p>
+        </div>
+
+        {error && <p className="empty" role="alert">{error}</p>}
+
+        {papers.length === 0 ? (
+          <p className="empty">
+            No manuscripts are available yet. The role <code>ps-paper-&lt;id&gt;-reader</code> enters
+            your token only after 2 of 3 authors have approved the change request and you have
+            refreshed the token.
+          </p>
+        ) : (
+          <ul className="rows">
+            {papers.map((paper) => (
+              <li key={paper.id}>
+                <ReviewerPaper paper={paper} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="probe" aria-labelledby="reviewer-probe">
+        <div className="probe__head">
+          <p className="row__icon row__icon--deny" aria-hidden="true">
+            <Icon name="lock" size={15} />
+          </p>
           <div>
-            <strong>Thử mở paper khác</strong>
-            <p>{probe || "p2 không được chia sẻ → 403. p3 đã hết hạn → 403 ở backend, và ORK từ chối giải mã."}</p>
+            <h3 className="probe__title" id="reviewer-probe">Attempt to open another manuscript</h3>
+            <p className="probe__lede">
+              p2 was never shared → 403. p3 has expired → 403 at the backend, and the ORK network
+              declines to decrypt it.
+            </p>
           </div>
         </div>
-        <div className="request-actions">
+        <div className="probe__actions">
           {PAPER_IDS.map((id) => (
-            <button key={id} className="button outline" onClick={() => probePaper(id)}>
-              Thử {id}
+            <button key={id} type="button" className="btn" onClick={() => probePaper(id)}>
+              <span className="btn__dot btn__dot--deny" aria-hidden="true" />
+              Attempt {id}
             </button>
           ))}
         </div>
-      </div>
-    </section>
+        <Proof state={probe} />
+      </section>
+    </>
   );
 }
 
 function ReviewerPaper({ paper }) {
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(null);
   const [pdfUrl, setPdfUrl] = useState("");
   const [note, setNote] = useState("");
+  const noteId = `note-${paper.id}`;
 
   useEffect(() => () => { if (pdfUrl) URL.revokeObjectURL(pdfUrl); }, [pdfUrl]);
 
   async function openPaper() {
-    setStatus("tải ciphertext rồi giải mã trong trình duyệt…");
+    setStatus({ tone: "pending", text: "downloading ciphertext and decrypting it within the browser…" });
     try {
       const policy = await policyFor(paper.id, "doc");
       const ciphertext = await api.getBlob(paper.id);
       const pdf = await decryptBytesForRecord(ciphertext, `doc:${paper.id}`, policy);
       setPdfUrl(URL.createObjectURL(new Blob([pdf], { type: "application/pdf" })));
-      setStatus(`đã giải mã ${pdf.length} byte`);
+      setStatus({ tone: "ok", text: `decrypted ${pdf.length} bytes` });
     } catch (e) {
-      setStatus(describeError(e));
+      setStatus({ tone: "deny", text: describeError(e) });
     }
   }
 
   async function sendFeedback() {
-    setStatus("mã hóa nhận xét (chỉ nhóm tác giả đọc được)…");
+    setStatus({ tone: "pending", text: "encrypting the feedback (readable by the author team alone)…" });
     try {
       const policy = await policyFor(paper.id, "fb");
       const ciphertext = await encryptForRecord(note, `fb:${paper.id}`, policy);
       await api.postFeedback(paper.id, ciphertext);
       setNote("");
-      setStatus("đã gửi nhận xét đã mã hóa");
+      setStatus({ tone: "ok", text: "encrypted feedback submitted" });
     } catch (e) {
-      setStatus(describeError(e));
+      setStatus({ tone: "deny", text: describeError(e) });
     }
   }
 
   return (
-    <article className="request-card">
-      <div className="request-head">
-        <h3>{paper.code_title ?? paper.id}</h3>
-        <span className="course-code">{paper.id} · {describeDeadline(paper.review_until)}</span>
-      </div>
-      <button className="button dark" onClick={openPaper}>Mở bản thảo</button>
-      {pdfUrl && (
-        <iframe
-          title={paper.id}
-          src={pdfUrl}
-          style={{ width: "100%", height: 520, marginTop: 12, border: 0 }}
-        />
-      )}
-      <textarea
-        className="request-reason"
-        style={{ width: "100%", minHeight: 62 }}
-        placeholder="Nhận xét cho nhóm tác giả (mã hóa, chỉ tác giả đọc)"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <div className="request-actions">
-        <button className="button outline" onClick={sendFeedback} disabled={!note}>Gửi nhận xét</button>
-        <span className="muted">{status}</span>
+    <article className="row">
+      <p className="row__icon" aria-hidden="true"><Icon name="file" size={15} /></p>
+      <div className="row__body">
+        <h4 className="row__title">{paper.code_title ?? paper.id}</h4>
+        <p className="row__detail">
+          {paper.id} · <Deadline reviewUntil={paper.review_until} />
+        </p>
+
+        <div className="console__row">
+          <button type="button" className="btn btn--primary" onClick={openPaper}>
+            Open manuscript
+          </button>
+        </div>
+
+        {pdfUrl && (
+          <iframe
+            title={`Decrypted manuscript: ${paper.code_title ?? paper.id}`}
+            src={pdfUrl}
+            style={{ width: "100%", height: 520, marginTop: 12, border: 0, borderRadius: 9 }}
+          />
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            sendFeedback();
+          }}
+        >
+          <label className="console__label" htmlFor={noteId}>
+            Feedback for the author team
+          </label>
+          <textarea
+            id={noteId}
+            className="field"
+            placeholder="Encrypted before it leaves the browser — readable by the author team alone."
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+          />
+          <div className="console__row">
+            <button type="submit" className="btn" disabled={!note}>
+              Submit feedback
+            </button>
+          </div>
+        </form>
+
+        <Proof state={status} />
       </div>
     </article>
   );
@@ -408,94 +631,124 @@ function ReviewerPaper({ paper }) {
 function OperatorConsole() {
   const [storage, setStorage] = useState(null);
   const [status, setStatus] = useState("");
-  const [attempt, setAttempt] = useState("");
-  const [extend, setExtend] = useState("");
+  const [attempt, setAttempt] = useState(null);
+  const [extend, setExtend] = useState(null);
 
   useEffect(() => {
     api.operatorStorage().then(setStorage).catch((e) => setStatus(describeError(e)));
   }, []);
 
   async function tryDecrypt(paperId) {
-    setAttempt(`tải ciphertext ${paperId} từ đĩa (Operator có toàn quyền storage) rồi thử giải mã…`);
+    setAttempt({ tone: "pending", text: `loading ciphertext ${paperId} from disk (the operator holds full storage access) and attempting decryption…` });
     try {
       const ciphertext = await api.operatorBlob(paperId);
       const [row] = await api.operatorPolicies(paperId);
-      if (!row) throw new Error(`chưa có policy doc:${paperId} trong DB — ký ở tab Ký policy trước`);
+      if (!row) throw new Error(`no policy doc:${paperId} exists in the database — sign it in Policy Signing first`);
       const policy = row.policy;
       const pdf = await decryptBytesForRecord(ciphertext, `doc:${paperId}`, policy);
-      setAttempt(`KHÔNG mong đợi: giải mã được ${pdf.length} byte. Ghi lại vào VERIFICATION_LOG (T9).`);
+      setAttempt({ tone: "pending", text: `UNEXPECTED: ${pdf.length} bytes were decrypted. Record this in VERIFICATION_LOG (T9).` });
     } catch (e) {
-      setAttempt(describeError(e));
+      setAttempt({ tone: "deny", text: describeError(e) });
     }
   }
 
   /** T16: Operator sửa hạn trong DB. Backend thôi chặn, nhưng hạn thật nằm trong policy đã ký. */
   async function extendP3() {
-    setExtend("PATCH /api/operator/papers/p3/review-until …");
+    setExtend({ tone: "pending", text: "PATCH /api/operator/papers/p3/review-until …" });
     try {
       const sevenDays = new Date(Date.now() + 7 * 24 * 3_600_000).toISOString();
       const row = await api.operatorSetReviewUntil("p3", sevenDays);
-      setExtend(`đã sửa DB: review_until = ${row.review_until ?? sevenDays}. Backend không còn chặn p3 — nhưng người phản biện vẫn không giải mã được: ORK kiểm tra expiry trong policy đã ký bằng threshold (T16).`);
+      setExtend({ tone: "deny", text: `database amended: review_until = ${row.review_until ?? sevenDays}. The backend no longer blocks p3 — yet the reviewer still cannot decrypt it, because the ORK network validates the expiry recorded in the threshold-signed policy (T16).` });
     } catch (e) {
-      setExtend(describeError(e));
+      setExtend({ tone: "deny", text: describeError(e) });
     }
   }
 
   return (
-    <section className="section">
-      <div className="section-heading">
-        <h2>Operator Console — người chạy server nhìn thấy gì</h2>
-        <span className="count-pill">{storage?.dir ?? "…"}</span>
-      </div>
-      {status && <p className="empty">{status}</p>}
-      <div className="audit-list">
-        {(storage?.files ?? []).map((file) => (
-          <div className="audit-row" key={file.name}>
-            <strong>{file.name}</strong>
-            <span className="audit-dot" />
-            <p style={{ wordBreak: "break-all" }}>{file.head_hex}</p>
-            <span className="audit-actor">
-              {file.size} B · {file.is_pdf ? "LÀ %PDF (!)" : "không phải %PDF"}
-            </span>
-          </div>
-        ))}
-      </div>
+    <>
+      <section className="section" aria-labelledby="operator-storage">
+        <div className="section__head">
+          <h3 className="section__title" id="operator-storage">What the server operator sees on disk</h3>
+          <p className="section__meta">{storage?.dir ?? "…"}</p>
+        </div>
 
-      <div className="blocked-card">
-        <div>
-          <span className="blocked-icon">🔐</span>
+        {status && <p className="empty" role="alert">{status}</p>}
+
+        <ul className="rows">
+          {(storage?.files ?? []).map((file) => (
+            <li className="row" key={file.name}>
+              <p className="row__icon" aria-hidden="true"><Icon name="file" size={15} /></p>
+              <div className="row__body">
+                <h4 className="row__title">{file.name}</h4>
+                <p className="row__detail">{file.head_hex}</p>
+              </div>
+              <p className="row__aside">
+                {file.size} B · {file.is_pdf ? "IS %PDF (!)" : "not %PDF"}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="probe" aria-labelledby="operator-decrypt">
+        <div className="probe__head">
+          <p className="row__icon row__icon--deny" aria-hidden="true">
+            <Icon name="lock" size={15} />
+          </p>
           <div>
-            <strong>Tải ciphertext rồi thử giải mã</strong>
-            <p>{attempt || "ORK kiểm tra lại mỗi lần giải mã: không có role reader của đúng paper và không có _tide_decryptor thì bị từ chối. Lỗi thật hiện nguyên văn kèm `cause`."}</p>
+            <h3 className="probe__title" id="operator-decrypt">Download the ciphertext and attempt decryption</h3>
+            <p className="probe__lede">
+              The ORK network re-evaluates every decryption: without the reader role for that
+              particular manuscript, and without <code>_tide_decryptor</code>, the request is
+              refused. The underlying error is reproduced verbatim, together with its{" "}
+              <code>cause</code>.
+            </p>
           </div>
         </div>
-        <div className="request-actions">
+        <div className="probe__actions">
           {PAPER_IDS.map((id) => (
-            <button key={id} className="button outline" onClick={() => tryDecrypt(id)}>
-              Thử giải mã {id}
+            <button key={id} type="button" className="btn" onClick={() => tryDecrypt(id)}>
+              <span className="btn__dot btn__dot--deny" aria-hidden="true" />
+              Attempt to decrypt {id}
             </button>
           ))}
         </div>
-      </div>
+        <Proof state={attempt} />
+      </section>
 
-      <div className="blocked-card">
-        <div>
-          <span className="blocked-icon">⏳</span>
+      <section className="probe" aria-labelledby="operator-extend">
+        <div className="probe__head">
+          <p className="row__icon row__icon--deny" aria-hidden="true">
+            <Icon name="refresh" size={15} />
+          </p>
           <div>
-            <strong>Gia hạn p3 bằng cách sửa DB</strong>
-            <p>{extend || "Operator sửa được cột review_until trong SQLite. Hạn thật nằm trong policy đã ký: mạng ORK vẫn từ chối."}</p>
+            <h3 className="probe__title" id="operator-extend">Extend p3 by amending the database</h3>
+            <p className="probe__lede">
+              The operator is able to modify the <code>review_until</code> column in SQLite. The
+              authoritative deadline resides in the signed policy: the ORK network refuses
+              nonetheless.
+            </p>
           </div>
         </div>
-        <button className="button outline" onClick={extendP3}>Gia hạn p3 (+7 ngày)</button>
-      </div>
+        <div className="probe__actions">
+          <button type="button" className="btn" onClick={extendP3}>
+            <span className="btn__dot btn__dot--pending" aria-hidden="true" />
+            Extend p3 (+7 days)
+          </button>
+        </div>
+        <Proof state={extend} />
+      </section>
 
-      <div className="demo-warning">
-        <span>TỰ CẤP QUYỀN</span>
-        Gán `ps-paper-p2-reader` cho chính mình trong tide-console chỉ tạo một change request
-        PENDING: phiếu tính cho người gọi HTTP, và Operator không phải `tide-realm-admin` nên không
-        duyệt được. Mở tide-console → QEA Approvals để xem.
-      </div>
-    </section>
+      <aside className="callout">
+        <p className="callout__tag">Self-granted access</p>
+        <p>
+          Assigning <code>ps-paper-p2-reader</code> to oneself in tide-console merely creates a
+          PENDING change request: the approval is attributed to the HTTP caller, and the operator
+          is not a <code>tide-realm-admin</code> and therefore cannot approve it. Open tide-console
+          → QEA Approvals to confirm.
+        </p>
+      </aside>
+    </>
   );
 }
 
@@ -535,9 +788,9 @@ function PolicySigner() {
     const expiry = grant.expires
       ? Math.floor(new Date(deadlines[grant.paper]).getTime() / 1000)
       : undefined;
-    const note = (text) => setStatus((prev) => ({ ...prev, [grant.name]: text }));
+    const note = (tone, text) => setStatus((prev) => ({ ...prev, [grant.name]: { tone, text } }));
 
-    note("mở enclave để duyệt…");
+    note("pending", "opening the enclave for approval…");
     signRelationshipPolicy(
       {
         vendorId: getVendorId(),
@@ -551,56 +804,82 @@ function PolicySigner() {
       .then((policy) =>
         api.savePolicy(grant.paper, { record: grant.record, subject_kind: "Role", subject, policy }),
       )
-      .then(() => note(`đã ký và lưu ${recordId} cho Role ${subject}`))
-      .catch((e) => note(describeError(e)));
+      .then(() => note("ok", `signed and stored ${recordId} for Role ${subject}`))
+      .catch((e) => note("deny", describeError(e)));
   }
 
   return (
-    <section className="section">
-      <div className="section-heading">
-        <h2>Ký policy RelationshipAttestation:1</h2>
-        <span className="approval-badge">chỉ tide-realm-admin · bước chuẩn bị</span>
-      </div>
-      <div className="request-form">
-        <div className="form-grid">
-          <label className="reason-field">
-            Admin policy (base64, lấy từ /admin/realms/&lt;realm&gt;/iga/role-policies/name/tide-realm-admin)
-            <textarea value={adminPolicy} onChange={(e) => setAdminPolicy(e.target.value)} />
-          </label>
-          <label>Hạn phản biện p1
-            <input
-              type="datetime-local"
-              value={deadlines.p1}
-              onChange={(e) => setDeadlines((prev) => ({ ...prev, p1: e.target.value }))}
-            />
-          </label>
-          <label>Hạn phản biện p3 (đặt trong quá khứ)
-            <input
-              type="datetime-local"
-              value={deadlines.p3}
-              onChange={(e) => setDeadlines((prev) => ({ ...prev, p3: e.target.value }))}
-            />
-          </label>
+    <>
+      <div className="console">
+        <label className="console__label" htmlFor="admin-policy">
+          Administrator policy (base64)
+        </label>
+        <textarea
+          id="admin-policy"
+          className="field"
+          value={adminPolicy}
+          onChange={(e) => setAdminPolicy(e.target.value)}
+          aria-describedby="admin-policy-hint"
+        />
+        <p className="console__hint" id="admin-policy-hint">
+          Obtain it from <code>/admin/realms/&lt;realm&gt;/iga/role-policies/name/tide-realm-admin</code>.
+          Only a <code>tide-realm-admin</code> may sign. This is a preparatory step, not part of the
+          demonstration itself.
+        </p>
+
+        <div className="console__row">
+          <label className="console__label" htmlFor="deadline-p1">Review deadline for p1</label>
+          <input
+            id="deadline-p1"
+            className="field"
+            type="datetime-local"
+            value={deadlines.p1}
+            onChange={(e) => setDeadlines((prev) => ({ ...prev, p1: e.target.value }))}
+            style={{ width: "auto" }}
+          />
+          <label className="console__label" htmlFor="deadline-p3">Review deadline for p3 (set in the past)</label>
+          <input
+            id="deadline-p3"
+            className="field"
+            type="datetime-local"
+            value={deadlines.p3}
+            onChange={(e) => setDeadlines((prev) => ({ ...prev, p3: e.target.value }))}
+            style={{ width: "auto" }}
+          />
         </div>
       </div>
-      <div className="reason-list">
-        {GRANTS.map((grant) => (
-          <div className="reason-item" key={grant.name}>
-            <span className="approved-tag">{grant.name}</span>
-            <div style={{ flex: 1 }}>
-              <strong>
-                {grant.record}:{grant.paper} · Role{" "}
-                {grant.subject === "reader" ? readerRole(grant.paper) : AUTHOR_ROLE} · {grant.access}
-                {grant.expires ? ` · hạn ${deadlines[grant.paper]}` : " · không hạn"}
-              </strong>
-              <p>{status[grant.name] ?? ""}</p>
-            </div>
-            <button className="button dark" onClick={() => sign(grant)} disabled={!adminPolicy.trim()}>
-              Ký
-            </button>
-          </div>
-        ))}
-      </div>
-    </section>
+
+      <section className="section" aria-labelledby="grants">
+        <div className="section__head">
+          <h3 className="section__title" id="grants">RelationshipAttestation:1 policies</h3>
+          <p className="section__meta">{GRANTS.length} policies</p>
+        </div>
+
+        <ul className="rows">
+          {GRANTS.map((grant) => (
+            <li className="grant" key={grant.name}>
+              <p className="grant__name">{grant.name}</p>
+              <div className="grant__body">
+                <p className="grant__spec">
+                  {grant.record}:{grant.paper} · Role{" "}
+                  {grant.subject === "reader" ? readerRole(grant.paper) : AUTHOR_ROLE} · {grant.access}
+                  {grant.expires ? ` · expires ${deadlines[grant.paper]}` : " · no expiry"}
+                </p>
+                <Proof state={status[grant.name]} />
+              </div>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => sign(grant)}
+                disabled={!adminPolicy.trim()}
+              >
+                <span className="btn__dot btn__dot--sign" aria-hidden="true" />
+                Sign
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }
